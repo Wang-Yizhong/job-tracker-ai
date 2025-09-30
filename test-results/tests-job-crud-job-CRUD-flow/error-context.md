@@ -1,0 +1,84 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e3]:
+      - img "Logo" [ref=e4]
+      - navigation [ref=e5]:
+        - link "Übersicht" [ref=e6] [cursor=pointer]:
+          - /url: /dashboard
+        - link "Stellen" [ref=e7] [cursor=pointer]:
+          - /url: /jobs
+        - link "Lebenslauf" [ref=e8] [cursor=pointer]:
+          - /url: /resume
+    - generic [ref=e11]:
+      - generic [ref=e12]:
+        - heading "Stellen" [level=1] [ref=e13]
+        - generic [ref=e14]:
+          - button "+ Neue Position" [ref=e15] [cursor=pointer]
+          - button "Aktualisieren" [ref=e16] [cursor=pointer]
+      - generic [ref=e18]:
+        - table [ref=e20]:
+          - rowgroup [ref=e21]:
+            - row "Position Firma Ort Status Bewerbungsdatum Link Aktionen" [ref=e22]:
+              - cell "Position" [ref=e23]
+              - cell "Firma" [ref=e24]
+              - cell "Ort" [ref=e25]
+              - cell "Status" [ref=e26]
+              - cell "Bewerbungsdatum" [ref=e27]
+              - cell "Link" [ref=e28]
+              - cell "Aktionen" [ref=e29]
+          - rowgroup [ref=e30]:
+            - 'row "{\"error\":\"Unauthorized\"}" [ref=e31]':
+              - 'cell "{\"error\":\"Unauthorized\"}" [ref=e32]'
+        - generic [ref=e33]:
+          - generic [ref=e34]: Gesamt 0 · Seite 1 / 1
+          - generic [ref=e35]:
+            - button "Zurück" [disabled] [ref=e36]
+            - button "Weiter" [disabled] [ref=e37]
+            - combobox [ref=e38]:
+              - option "10/Seite" [selected]
+              - option "20/Seite"
+              - option "50/Seite"
+      - generic [ref=e40]:
+        - generic [ref=e41]:
+          - heading "Neue Position" [level=3] [ref=e42]
+          - button "Close" [ref=e43] [cursor=pointer]: ✕
+        - generic [ref=e45]:
+          - generic [ref=e46]:
+            - generic [ref=e47]:
+              - generic [ref=e48]: Titel *
+              - textbox "Titel *" [ref=e49]: Frontend Developer
+            - generic [ref=e50]:
+              - generic [ref=e51]: Firma *
+              - textbox "Firma *" [ref=e52]: Acme Inc
+            - generic [ref=e53]:
+              - generic [ref=e54]: Ort
+              - textbox "Ort" [ref=e55]
+            - generic [ref=e56]:
+              - generic [ref=e57]: Link zur Stelle
+              - textbox "Link zur Stelle" [ref=e58]
+            - generic [ref=e59]:
+              - generic [ref=e60]: Status *
+              - combobox "Status *" [ref=e61]:
+                - option "Entwurf" [selected]
+                - option "Gespeichert"
+                - option "Beworben"
+                - option "Interview"
+                - option "Angebot"
+                - option "Abgelehnt"
+                - option "Eingestellt"
+            - generic [ref=e62]:
+              - generic [ref=e63]: Bewerbungsdatum
+              - textbox "Bewerbungsdatum" [ref=e64]
+          - generic [ref=e65]:
+            - generic [ref=e66]: Stellenbeschreibung
+            - textbox "Stellenbeschreibung" [ref=e67]
+          - generic [ref=e68]:
+            - button "Abbrechen" [ref=e69] [cursor=pointer]
+            - button "Speichern" [ref=e70] [cursor=pointer]
+  - button "Open Next.js Dev Tools" [ref=e76] [cursor=pointer]:
+    - img [ref=e77] [cursor=pointer]
+  - alert [ref=e80]
+```

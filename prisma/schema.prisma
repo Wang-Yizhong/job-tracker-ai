@@ -1,0 +1,157 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/**
+ * ===================== 用户与验证 =====================
+ */
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String
+  emailVerified DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  positions          Position[]
+  verificationTokens VerificationToken[] @relation("UserVerificationTokens")
+  resumeSeries       ResumeSeries[]
+}
+
+model VerificationToken {
+  id        String   @id @default(cuid())
+  userId    String
+  hash      String
+  type      String // 'EMAIL_VERIFY'
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(name: "UserVerificationTokens", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([hash])
+  @@index([userId, type])
+  @@index([expiresAt])
+}
+
+/**
+ * ===================== 求职岗位 =====================
+ */
+model Position {
+  id       String  @id @default(cuid())
+  userId   String
+  title    String
+  company  String
+  location String? // e.g., "Stuttgart, DE"
+  link     String? // original job posting URL
+  source   String? // LinkedIn, Company, Xing, etc.
+
+  status   PositionStatus @default(SAVED)
+  priority Int? // 1..5
+
+  salaryMin Int?
+  salaryMax Int?
+  currency  String? // EUR, USD
+
+  appliedAt DateTime?
+  notes     String?
+  tags      String[] // Postgres string[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId, status])
+  @@index([userId, company])
+  @@index([userId, title])
+}
+
+enum PositionStatus {
+  DRAFT
+  SAVED
+  APPLIED
+  INTERVIEW
+  OFFER
+  REJECTED
+  HIRED
+}
+
+/**
+ * ===================== 简历：系列 + 版本 + 字段 =====================
+ */
+/**
+ * ResumeSeries：一套简历（如 English CV / Deutsch CV）
+ * activeVersionId：当前默认版本（可为空）
+ */
+model ResumeSeries {
+  id              String   @id @default(cuid())
+  userId          String
+  title           String
+  language        String? // "en" | "de" | ... 也可后续换 enum
+  activeVersionId String?  @unique
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  versions      ResumeVersion[]
+  activeVersion ResumeVersion?  @relation("ActiveResumeVersion", fields: [activeVersionId], references: [id])
+
+  @@index([userId, updatedAt(sort: Desc)])
+  @@index([userId])
+  @@index([userId, language]) // 新增索引，便于按语言过滤
+}
+
+/**
+ * ResumeVersion：系列中的一个实际“文件版本”
+ */
+model ResumeVersion {
+  id       String @id @default(cuid())
+  seriesId String
+
+  // 原文件信息（用于签名 URL 预览）
+  fileKey    String
+  fileName   String
+  mimeType   String?
+  fileSize   Int?
+  uploadedAt DateTime @default(now())
+
+  // 解析态
+  sourceText   String?
+  parsedAt     DateTime?
+  snapshotJson String?
+  note         String?
+
+  series ResumeSeries  @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  fields ResumeField[]
+
+  // 与系列的“激活版本”反向关系（可选）
+  activeInSeries ResumeSeries? @relation("ActiveResumeVersion")
+
+  @@index([seriesId, uploadedAt(sort: Desc)])
+  @@index([seriesId])
+}
+
+/**
+ * ResumeField：细粒度字段（挂在“版本”上）
+ */
+model ResumeField {
+  id        String @id @default(cuid())
+  versionId String
+
+  key          String
+  label        String
+  value        String
+  aiSuggestion String?
+  updatedByAI  Boolean @default(false)
+  order        Int     @default(0)
+
+  version ResumeVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+
+  @@index([versionId, order])
+}

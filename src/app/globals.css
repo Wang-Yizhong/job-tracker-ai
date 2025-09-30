@@ -1,0 +1,135 @@
+/* src/app/globals.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+
+html {
+  font-family: 'Inter', system-ui, sans-serif;
+}
+/* 全局统一白底主题（忽略系统深浅色偏好） */
+:root { 
+  color-scheme: light;
+}
+
+* { -webkit-tap-highlight-color: transparent; }
+.overflow-auto::-webkit-scrollbar{ width:8px;height:8px }
+.overflow-auto::-webkit-scrollbar-thumb{ background:#d1d5db;border-radius:8px }
+.overflow-auto:hover::-webkit-scrollbar-thumb{ background:#9ca3af }
+/* ========== 基础打印设置 ========== */
+/* 只打印简历主体（可保留） */
+@media print {
+  
+  /* 纸张与边距 */
+  @page { size: A4; margin: 10mm; }
+
+  /* 保证页面可自然分页，不被外层 overflow 限制 */
+  html, body { height: auto !important; overflow: visible !important; }
+
+  /* 只隐藏不该打印的 UI（给它们加 print:hidden 或这些类） */
+  .print\\:hidden{ display: none !important; }
+
+  /* 经验区分页友好 */
+  h1, h2, h3 { break-after: avoid; }
+  p, li { orphans: 2; widows: 2; }
+  .experience { break-inside: auto; }
+  .experience-header { break-after: avoid; }
+  .experience-firstlines { break-inside: avoid; }
+  .experience li { break-inside: avoid; }
+
+  /* 去阴影、圆角、滚动条 */
+  .resume-sheet { box-shadow: none !important; border-radius: 0 !important; }
+  ::-webkit-scrollbar { display: none; }
+}
+
+/* 可选：与 Tailwind v4 预设映射（若未使用可保留或删除） */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+/* 即使系统为暗色，也保持白底方案（不改色） */
+@media (prefers-color-scheme: dark) {
+  :root { /* 保持空即可，依然用 light 方案 */ }
+}
+
+/* 始终白底（用变量驱动） */
+body {}
+
+/* ------------ 设计令牌（HSL）------------ */
+@layer base {
+  :root {
+    /* Light palette（你的品牌色） */
+    --background: 210 20% 98%;   /* #F9FAFB */
+    --foreground: 221 39% 11%;   /* #111827 */
+
+    --card: 210 20% 98%;
+    --card-foreground: 221 39% 11%;
+
+    --popover: 210 20% 98%;
+    --popover-foreground: 221 39% 11%;
+
+    --primary: 243 75% 59%;          /* #4F46E5 */
+    --primary-foreground: 0 0% 100%;  /* #FFFFFF */
+
+    --secondary: 189 94% 43%;         /* #06B6D4 */
+    --secondary-foreground: 0 0% 100%;
+
+    --accent: 38 92% 50%;             /* #F59E0B */
+    --accent-foreground: 221 39% 11%;
+
+    --muted: 218 11% 65%;             /* #9CA3AF */
+    --muted-foreground: 221 39% 11%;
+
+    --border: 220 13% 91%;            /* #E5E7EB */
+    --input: 220 13% 91%;
+    --ring: 243 75% 59%;              /* 同 primary */
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+
+    /* 圆角体系：与你的 2xl=1rem 对齐 */
+    --radius: 1rem;
+  }
+
+  /* 暗色模式：与 light 同值，确保视觉始终白底 */
+  .dark {
+    --background: 210 20% 98%;
+    --foreground: 221 39% 11%;
+
+    --card: 210 20% 98%;
+    --card-foreground: 221 39% 11%;
+
+    --popover: 210 20% 98%;
+    --popover-foreground: 221 39% 11%;
+
+    --primary: 243 75% 59%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 189 94% 43%;
+    --secondary-foreground: 0 0% 100%;
+
+    --accent: 38 92% 50%;
+    --accent-foreground: 221 39% 11%;
+
+    --muted: 218 11% 65%;
+    --muted-foreground: 221 39% 11%;
+
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 243 75% 59%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+
+    --radius: 1rem;
+  }
+}
+
+/* 让 Tailwind 语义色引用上面的令牌 */
+@layer base {
+  * { @apply border-border; }
+  body { @apply bg-background text-foreground; }
+}
