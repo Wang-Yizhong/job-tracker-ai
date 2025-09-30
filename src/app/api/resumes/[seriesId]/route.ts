@@ -10,11 +10,12 @@ export const runtime = "nodejs";
  * POST /api/resumes/:seriesId/activate
  * body: { versionId: string }
  */
-type Ctx = { params: Record<string, string> };
-
-export async function POST(req: Request, { params }: Ctx) {
+export async function POST(
+  req: Request,
+  { params }: { params: Record<string, string> }   // ✅ 内联类型，别用别名/接口
+) {
   try {
-    const cookieStore = cookies(); // ✅ 同步
+    const cookieStore = cookies();
     const token = cookieStore.get(cookieName)?.value;
     const session = token ? verifySessionValue(token) : null;
     if (!session) {
@@ -33,18 +34,14 @@ export async function POST(req: Request, { params }: Ctx) {
 
     // 校验：version 属于该 series，且 series 属于当前用户
     const exists = await prisma.resumeVersion.findFirst({
-      where: {
-        id: versionId,
-        seriesId,
-        series: { userId: session.uid },
-      },
+      where: { id: versionId, seriesId, series: { userId: session.uid } },
       select: { id: true },
     });
     if (!exists) {
       return NextResponse.json({ error: "Version not found" }, { status: 404 });
     }
 
-    // ✅ 用 updateMany 防越权
+    // 防越权更新
     const r = await prisma.resumeSeries.updateMany({
       where: { id: seriesId, userId: session.uid },
       data: { activeVersionId: versionId, updatedAt: new Date() },
@@ -53,7 +50,6 @@ export async function POST(req: Request, { params }: Ctx) {
       return NextResponse.json({ error: "Series not found" }, { status: 404 });
     }
 
-    // 返回最新数据
     const updated = await prisma.resumeSeries.findFirst({
       where: { id: seriesId, userId: session.uid },
       include: {

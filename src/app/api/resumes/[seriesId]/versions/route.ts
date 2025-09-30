@@ -6,16 +6,18 @@ import { cookieName, verifySessionValue } from "@/lib/session";
 
 export const runtime = "nodejs";
 
-type Ctx = { params: Record<string, string> };
-
-export async function GET(_req: Request, { params }: Ctx) {
+// GET
+export async function GET(
+  _req: Request,
+  { params }: { params: Record<string, string> }   // ✅ 内联
+) {
   try {
     const seriesId = params?.seriesId;
     if (!seriesId) {
       return NextResponse.json({ error: "Missing seriesId" }, { status: 400 });
     }
 
-    const cookieStore = cookies(); // ✅ 同步
+    const cookieStore = cookies();
     const token = cookieStore.get(cookieName)?.value;
     const session = token ? verifySessionValue(token) : null;
     if (!session) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -35,14 +37,18 @@ export async function GET(_req: Request, { params }: Ctx) {
   }
 }
 
-export async function POST(req: Request, { params }: Ctx) {
+// POST
+export async function POST(
+  req: Request,
+  { params }: { params: Record<string, string> }   // ✅ 内联
+) {
   try {
     const seriesId = params?.seriesId;
     if (!seriesId) {
       return NextResponse.json({ error: "Missing seriesId" }, { status: 400 });
     }
 
-    const cookieStore = cookies(); // ✅ 同步
+    const cookieStore = cookies();
     const token = cookieStore.get(cookieName)?.value;
     const session = token ? verifySessionValue(token) : null;
     if (!session) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
