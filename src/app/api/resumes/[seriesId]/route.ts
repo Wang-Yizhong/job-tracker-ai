@@ -10,21 +10,23 @@ export const runtime = "nodejs";
  * POST /api/resumes/:seriesId/activate
  * body: { versionId: string }
  */
-export async function POST(
-  req: Request,
-  { params }: { params: { seriesId: string } }
-) {
+type Ctx = { params: Record<string, string> };
+
+export async function POST(req: Request, { params }: Ctx) {
   try {
-    const cookieStore = cookies(); // ✅ 同步，不要 await
+    const cookieStore = cookies(); // ✅ 同步
     const token = cookieStore.get(cookieName)?.value;
     const session = token ? verifySessionValue(token) : null;
     if (!session) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    const { versionId } = await req.json();
-    const { seriesId } = params;
+    const seriesId = params?.seriesId;
+    if (!seriesId) {
+      return NextResponse.json({ error: "Missing seriesId" }, { status: 400 });
+    }
 
+    const { versionId } = await req.json();
     if (!versionId || typeof versionId !== "string") {
       return NextResponse.json({ error: "versionId required" }, { status: 400 });
     }
@@ -42,7 +44,7 @@ export async function POST(
       return NextResponse.json({ error: "Version not found" }, { status: 404 });
     }
 
-    // ✅ 用 updateMany 防越权（当 userId 不是唯一键的一部分时）
+    // ✅ 用 updateMany 防越权
     const r = await prisma.resumeSeries.updateMany({
       where: { id: seriesId, userId: session.uid },
       data: { activeVersionId: versionId, updatedAt: new Date() },
