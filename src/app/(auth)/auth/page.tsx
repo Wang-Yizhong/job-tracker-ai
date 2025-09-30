@@ -64,8 +64,9 @@ function Divider({ text = "oder" }) {
   );
 }
 
-export default function AuthPage({ defaultMode = "login" as Mode }: { defaultMode?: Mode }) {
-  const [mode, setMode] = useState<Mode>(defaultMode);
+export default function AuthPage() {
+  // 👇 默认登录模式
+  const [mode, setMode] = useState<Mode>("login");
 
   // Nach Registrierung: Hinweis "E-Mail prüfen" + Cooldown
   const [verifyEmail, setVerifyEmail] = useState<string | null>(null);
@@ -124,7 +125,7 @@ export default function AuthPage({ defaultMode = "login" as Mode }: { defaultMod
       lastRegisterRef.current = values;
       const payload = { email: values.email, password: values.password };
 
-      const data= await api.post("/register", payload);
+      const data = await api.post("/register", payload);
 
       if (data?.alreadyVerified) {
         setMode("login");
@@ -137,7 +138,6 @@ export default function AuthPage({ defaultMode = "login" as Mode }: { defaultMod
         return;
       }
 
-      // 成功：展示提示卡片 + 短暂冷却（此处保留你原 3s/60s 逻辑）
       setVerifyEmail(values.email);
       setCooldown(3);
     } catch (err: any) {
@@ -171,7 +171,7 @@ export default function AuthPage({ defaultMode = "login" as Mode }: { defaultMod
     if (!verifyEmail || cooldownActive) return;
     try {
       await api.post("/resend-verify", { email: verifyEmail });
-      setCooldown(60); // 防枚举：无论成功与否都冷却
+      setCooldown(60);
     } catch (e) {
       setCooldown(60);
       console.warn("Resend fehlgeschlagen:", e);
@@ -212,7 +212,7 @@ export default function AuthPage({ defaultMode = "login" as Mode }: { defaultMod
             </button>
           </div>
 
-          {/* Hinweiskarte nach Registrierung */}
+          {/* Register success notice */}
           {mode === "register" && verifyEmail ? (
             <div className="space-y-4">
               <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
@@ -291,9 +291,6 @@ export default function AuthPage({ defaultMode = "login" as Mode }: { defaultMod
                   <input type="checkbox" {...registerLogin("rememberMe")} className="h-4 w-4" />
                   Eingeloggt bleiben
                 </label>
-                {/* <AppLink href="#" className="text-sm text-primary-600 hover:underline">
-                  Passwort vergessen?
-                </AppLink> */}
               </div>
 
               <SubmitButton loading={loading}>Anmelden</SubmitButton>
