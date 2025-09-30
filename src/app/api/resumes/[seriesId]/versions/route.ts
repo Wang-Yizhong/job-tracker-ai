@@ -1,3 +1,4 @@
+// src/app/api/.../route.ts
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { cookies } from "next/headers";
@@ -7,11 +8,11 @@ export const runtime = "nodejs";
 
 export async function GET(
   _req: Request,
-  ctx: { params: Promise<{ seriesId: string }> }          // ✅ params 是 Promise
+  { params }: { params: { seriesId: string } }
 ) {
   try {
-    const { seriesId } = await ctx.params;               // ✅ await params
-    const cookieStore = await cookies();                 // ✅ await cookies
+    const { seriesId } = params;                  // ✅ 不再 await
+    const cookieStore = cookies();                // ✅ 同步
     const token = cookieStore.get(cookieName)?.value;
     const session = token ? verifySessionValue(token) : null;
     if (!session) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -33,11 +34,11 @@ export async function GET(
 
 export async function POST(
   req: Request,
-  ctx: { params: Promise<{ seriesId: string }> }          // ✅ params 是 Promise
+  { params }: { params: { seriesId: string } }
 ) {
   try {
-    const { seriesId } = await ctx.params;               // ✅ await params
-    const cookieStore = await cookies();                 // ✅ await cookies
+    const { seriesId } = params;                  // ✅ 不再 await
+    const cookieStore = cookies();                // ✅ 同步
     const token = cookieStore.get(cookieName)?.value;
     const session = token ? verifySessionValue(token) : null;
     if (!session) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });

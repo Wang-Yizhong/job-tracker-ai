@@ -4,10 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { requireUserId } from "@/lib/auth";
 import { updatePositionSchema } from "@/lib/validation/position";
 
-type Ctx = { params: { id: string } };
-
-// 读单条（可选）
-export async function GET(_req: Request, { params }: Ctx) {
+// 读单条
+export async function GET(_req: Request, { params }: { params: { id: string } }) {
   const userId = await requireUserId();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -15,11 +13,11 @@ export async function GET(_req: Request, { params }: Ctx) {
     where: { id: params.id, userId },
   });
   if (!item) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  return NextResponse.json(item); // 或 { data: item }
+  return NextResponse.json(item);
 }
 
 // 更新
-export async function PUT(req: Request, { params }: Ctx) {
+export async function PUT(req: Request, { params }: { params: { id: string } }) {
   const userId = await requireUserId();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -29,30 +27,27 @@ export async function PUT(req: Request, { params }: Ctx) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  // 如果你的 DB 字段是 link 而前端传 url，这里做一次映射；若已统一成 url，可删除这段。
   const { url, ...rest } = parsed.data as any;
   const data = { ...rest, ...(url !== undefined ? { link: url } : {}) };
 
-  try {
-    const updated = await prisma.position.update({
-      where: { id: params.id, /* 如果有复合唯一键可加 userId */ },
-      data,
-    });
-    return NextResponse.json(updated); // 前端的 fetchJSON<Job> 期望直接是对象
-  } catch {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
+  const r = await prisma.position.updateMany({
+    where: { id: params.id, userId },
+    data,
+  });
+
+  if (r.count === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  // 返回更新后的对象（再查一次）
+  const updated = await prisma.position.findFirst({ where: { id: params.id, userId } });
+  return NextResponse.json(updated);
 }
 
 // 删除
-export async function DELETE(_req: Request, { params }: Ctx) {
+export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
   const userId = await requireUserId();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  try {
-    await prisma.position.delete({ where: { id: params.id } });
-    return NextResponse.json({ ok: true });
-  } catch {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
+  const r = await prisma.position.deleteMany({ where: { id: params.id, userId } });
+  if (r.count === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  return NextResponse.json({ ok: true });
 }
