@@ -1,4 +1,5 @@
 // src/app/api/.../route.ts
+import type { NextRequest, RouteContext } from "next/server";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { cookies } from "next/headers";
@@ -8,16 +9,16 @@ export const runtime = "nodejs";
 
 // GET
 export async function GET(
-  _req: Request,
-  { params }: { params: Record<string, string> }   // ✅ 内联
+  _req: NextRequest,
+  { params }: RouteContext<{ seriesId: string }>
 ) {
   try {
-    const seriesId = params?.seriesId;
+    const { seriesId } = params;
     if (!seriesId) {
       return NextResponse.json({ error: "Missing seriesId" }, { status: 400 });
     }
 
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const token = cookieStore.get(cookieName)?.value;
     const session = token ? verifySessionValue(token) : null;
     if (!session) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -39,26 +40,26 @@ export async function GET(
 
 // POST
 export async function POST(
-  req: Request,
-  { params }: { params: Record<string, string> }   // ✅ 内联
+  req: NextRequest,
+  { params }: RouteContext<{ seriesId: string }>
 ) {
   try {
-    const seriesId = params?.seriesId;
+    const { seriesId } = params;
     if (!seriesId) {
       return NextResponse.json({ error: "Missing seriesId" }, { status: 400 });
     }
 
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const token = cookieStore.get(cookieName)?.value;
     const session = token ? verifySessionValue(token) : null;
     if (!session) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
-    const body = await req.json().catch(() => ({}));
-    const fileKey: string | undefined = body.fileKey;
-    const fileName: string | undefined = body.fileName || body.filename;
-    const mimeType: string | undefined = body.mimeType;
-    const fileSize: number | undefined = body.fileSize;
-    const note: string | undefined = body.note;
+    const body = await req.json().catch(() => ({} as Record<string, unknown>));
+    const fileKey = body["fileKey"] as string | undefined;
+    const fileName = (body["fileName"] as string | undefined) ?? (body["filename"] as string | undefined);
+    const mimeType = body["mimeType"] as string | undefined;
+    const fileSize = body["fileSize"] as number | undefined;
+    const note = body["note"] as string | undefined;
 
     if (!fileKey || !fileName) {
       return NextResponse.json({ error: "Missing fileKey or fileName" }, { status: 400 });
