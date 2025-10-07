@@ -7,7 +7,7 @@ import ResumeHistory from "../../components/resumes/ResumeHistory";
 import ResumeA4Editor from "../../components/resumes/ResumeA4Editor";
 import AnalysisPanel, { MatchMatrix } from "../../components/resumes/AnalysisPanel";
 import QuestionFlow from "../../components/resumes/QuestionFlow";
-import {http} from "@/lib/axios";
+import { http } from "@/lib/axios";
 import type { ResumeData } from "@/types/resume";
 
 /* =================== Helpers & Types =================== */
@@ -16,6 +16,7 @@ type ParsedJobRaw = { skills?: string[]; tags?: string[]; requirements?: (Requir
 
 /** 兼容 /resumes/parse 的各种返回形状，并兜底 skills=[] */
 function safeUnwrapResume(res: any): ResumeData {
+  // 你的 http 返回值就是 data，这里仍做兼容
   const raw = res?.data ?? res;
   const resumeObj = raw?.resume ?? raw?.data ?? raw;
   if (!resumeObj || typeof resumeObj !== "object") throw new Error("Parser lieferte kein gültiges Resume-Objekt");
@@ -28,7 +29,7 @@ function extractKeywordsFallback(text: string): string[] {
   return String(text || "")
     .toLowerCase()
     .replace(/[(){}\[\],:;'"“”‘’]/g, " ")
-    .split(/[^a-z0-9#+.\-]/g) // 保留 C++ / C# / .NET / tailwindcss 等
+    .split(/[^a-z0-9#+.\-]/g)
     .filter(Boolean)
     .filter((w) => w.length >= 2)
     .slice(0, 40);
@@ -40,7 +41,6 @@ function buildJobForMatrix(raw: ParsedJobRaw | null | undefined, textBlob: strin
   const reqsMixed = Array.isArray(raw?.requirements) ? raw!.requirements! : [];
   const skills = Array.isArray(raw?.skills) ? raw!.skills! : [];
 
-  // 1) 归一化 requirements
   let requirements: Requirement[] = reqsMixed
     .map((r: any) =>
       typeof r === "string"
@@ -55,19 +55,16 @@ function buildJobForMatrix(raw: ParsedJobRaw | null | undefined, textBlob: strin
     )
     .filter((r) => r.text);
 
-  // 2) 若为空，用 tags/skills 填充
   if (requirements.length === 0) {
     const base = [...tags, ...skills].map((t) => String(t).trim()).filter(Boolean);
     requirements = base.map((t) => ({ text: t, group: "Tech" }));
   }
 
-  // 3) 还为空：用 JD 文本提关键词兜底
   if (requirements.length === 0) {
     const kw = extractKeywordsFallback(textBlob);
     requirements = kw.map((t) => ({ text: t, group: "Tech" }));
   }
 
-  // 4) 去重（按小写文本）
   const seen = new Set<string>();
   requirements = requirements.filter((r) => {
     const k = r.text.toLowerCase();
@@ -79,27 +76,27 @@ function buildJobForMatrix(raw: ParsedJobRaw | null | undefined, textBlob: strin
   return { ...(raw ?? {}), requirements, skills };
 }
 
-/* -------- API helpers -------- */
+/* -------- API helpers（你的 http 返回值就是 data） -------- */
 async function getSignedUrlByFileKey(fileKey: string): Promise<string> {
   const res = await http.post<{ url: string }>("/resumes/sign", { fileKey });
-  const  url  = res.url;
+  const url = (res as any)?.url;
   if (!url) throw new Error("Signierte URL fehlt im Response");
   return url;
 }
 
- async function parseJob(text: string): Promise<ParsedJobRaw | null> {
+async function parseJob(text: string): Promise<ParsedJobRaw | null> {
   const res = await http.post<ParsedJobRaw | null>("/parse-job", { text });
-  return res;
+  return (res as any) ?? null;
 }
 
 async function callMatchMatrix(job: any, resumeSkills: string[]) {
   const res = await http.post("/match-matrix", { job, resume: { skills: resumeSkills } });
-  return res;
+  return res as any;
 }
 
 async function requestAiSuggestion(section: string, text: string, jobContext?: string) {
   const res = await http.post<{ suggestion?: string }>("/ai/suggest", { section, text, jobContext });
-  return (res?.suggestion ?? "").trim();
+  return (res as any)?.suggestion?.trim?.() ?? "";
 }
 
 /* ============== JD Plausibilitätscheck ============== */
@@ -143,6 +140,9 @@ export default function ResumePage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [mockUrl, setMockUrl] = useState<string | null>(null);
 
+  // 标记：创建系列后是否应立即打开文件选择器
+  const shouldAutoUploadRef = useRef(false);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
@@ -179,7 +179,6 @@ export default function ResumePage() {
   const jdCheck = isLikelyJobDescription(jobContext || "");
   const canAnalyze = Boolean((fileKey || mockUrl) && jdCheck.ok);
 
-  /** ✅ 关键：保证 setMatch 传入的是“后端的真实数据”，且 job 不为空 */
   async function handleAnalyze() {
     const isMock = fileKey === "MOCK";
     if (!isMock && (!fileKey || !versionId)) {
@@ -205,15 +204,13 @@ export default function ResumePage() {
       const resumeSkills: string[] = Array.isArray(resumeData.skills) ? resumeData.skills : [];
       setResume(resumeData);
 
-      // 2) JD 解析 + 归一化为 matrix 需要的 job（保证 requirements 非空）
+      // 2) JD 解析 + 归一化
       const parsedJobRaw = await parseJob(jobContext);
       const jobForMatrix = buildJobForMatrix(parsedJobRaw, jobContext);
       setJobParsed(jobForMatrix);
 
-      // 3) 调用 /api/match-matrix —— 不再做二次映射，直接使用后端返回
-   const mm = (await callMatchMatrix(jobForMatrix, resumeSkills)) as any;
-
-      // ✅ 直接传后端结构给 AnalysisPanel（仅做轻微兜底）
+      // 3) match matrix
+      const mm = await callMatchMatrix(jobForMatrix, resumeSkills);
       const uiMatch: MatchMatrix = {
         total: typeof mm?.total === "number" ? mm.total : Array.isArray(mm?.rows) ? mm.rows.length : 0,
         covered:
@@ -225,7 +222,7 @@ export default function ResumePage() {
         rows: Array.isArray(mm?.rows) ? mm.rows : [],
       };
       setMatch(uiMatch);
-      setStep(2); // 确保跳到分析页
+      setStep(2);
     } catch (e: any) {
       alert(e?.response?.data?.error || e?.message || "Analyse fehlgeschlagen");
     } finally {
@@ -259,38 +256,49 @@ Nice: Stripe, Kubernetes, gRPC, MQTT, RabbitMQ, Grafana, OpenTelemetry
     }, 0);
   }
 
+  /** ✅ 新建系列：自动回填 seriesId，并立刻触发文件上传 */
   async function confirmCreateSeries() {
     const title = seriesTitle.trim();
     if (!title) return;
     try {
       const res = await http.post<{ id: string }>("/resumes", { title, language: seriesLang || null });
-      const  id  = res.id;
+      const id = (res as any)?.id;
+
       setShowSeriesModal(false);
       setSeriesTitle("");
       setSeriesLang("de");
-      setSeriesId(id);
+
+      setSeriesId(id); // ✅ 关键：回填
       setVersionId(null);
       setFileKey(null);
       setFilename(undefined);
       setMockUrl(null);
       setRefreshKey((k) => k + 1);
+
+      // ✅ 新建成功后自动打开文件选择器
+      shouldAutoUploadRef.current = true;
+      setTimeout(() => fileInputRef.current?.click(), 0);
     } catch (err: any) {
       alert(err?.response?.data?.error || err?.message || "Serie konnte nicht erstellt werden");
     }
   }
 
+  /** 上传按钮点击：若没选系列则先创建 */
   function triggerCreateVersion() {
     if (!seriesId) {
-      alert("Bitte wähle zuerst eine Serie (links in der Liste).");
+      setShowSeriesModal(true);
+      // 由 confirmCreateSeries 完成后自动触发上传
       return;
     }
     fileInputRef.current?.click();
   }
 
+  /** 选中文件后上传版本 */
   async function onVersionFilePicked(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     e.target.value = "";
     if (!f) return;
+
     if (!seriesId) {
       alert("Bitte wähle zuerst eine Serie");
       return;
@@ -301,19 +309,24 @@ Nice: Stripe, Kubernetes, gRPC, MQTT, RabbitMQ, Grafana, OpenTelemetry
       fd.append("file", f);
 
       const upRes = await http.post<{ fileKey: string }>("/resumes/upload", fd);
-      const { fileKey } = upRes;
+      const { fileKey } = upRes as any;
 
       const vRes = await http.post<{ id: string; fileKey: string; fileName: string }>(`/resumes/${seriesId}/versions`, {
         fileKey,
         fileName: f.name,
       });
-      const { id, fileName } = vRes;
+      const { id, fileName } = vRes as any;
 
       setVersionId(id);
       setFileKey(fileKey);
       setFilename(fileName);
       setMockUrl(null);
       setRefreshKey((k) => k + 1);
+
+      // 如果是“新建系列后自动上传”的链路，恢复标志位
+      if (shouldAutoUploadRef.current) {
+        shouldAutoUploadRef.current = false;
+      }
     } catch (err: any) {
       alert(err?.response?.data?.error || err?.message || "Version konnte nicht erstellt werden");
     }
@@ -367,7 +380,11 @@ Nice: Stripe, Kubernetes, gRPC, MQTT, RabbitMQ, Grafana, OpenTelemetry
                 >
                   + Neue Serie
                 </button>
-                <button type="button" className="rounded-xl border border-border bg-white px-4 py-2 text-sm hover:bg-background" onClick={triggerCreateVersion}>
+                <button
+                  type="button"
+                  className="rounded-xl border border-border bg-white px-4 py-2 text-sm hover:bg-background"
+                  onClick={triggerCreateVersion}
+                >
                   Lebenslauf hochladen
                 </button>
                 <input
@@ -572,7 +589,7 @@ Nice: Stripe, Kubernetes, gRPC, MQTT, RabbitMQ, Grafana, OpenTelemetry
           match={match ?? undefined}
           onNext={() => setStep(3)}
           onStartQA={() => setShowQA(true)}
-          pageLimit={50}   // 放大，避免切片后看不到
+          pageLimit={50}
           showBadge
         />
         {resume && match && (

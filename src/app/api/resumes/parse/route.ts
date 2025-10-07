@@ -7,7 +7,8 @@ export const runtime = "nodejs";
 
 // 可配置：允许的下载域名（避免 SSRF）。你的 Supabase 项目域名放这里。
 const URL_WHITELIST = [
-  "tyvshioiuupglckpvgxu.supabase.co",
+  "tyvshioiuupglckpvgxu.supabase.co",//dev
+  "tysadejbjdmplxambrfq.supabase.co"//pro
 ];
 
 const MAX_BYTES = 15 * 1024 * 1024; // 15MB 上限（可按需调整）
