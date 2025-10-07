@@ -1,4 +1,3 @@
-// --- file: src/app/verify/page.tsx
 import type { Metadata } from "next";
 import CountdownRedirect from "./CountdownRedirect";
 
@@ -69,13 +68,10 @@ async function verifyToken(
   }
 }
 
-export default async function VerifyPage({
-  searchParams,
-}: {
-  searchParams?: SP;
-}) {
-  const token = searchParams?.token ?? "";
-  const emailFromUrl = searchParams?.email ?? undefined;
+export default async function VerifyPage({ searchParams }: any) {
+  const resolvedParams = (await (searchParams ?? {})) as { token?: string; email?: string };
+  const token = resolvedParams.token ?? "";
+  const emailFromUrl = resolvedParams.email ?? undefined;
 
   const result = await verifyToken(token);
 
@@ -144,3 +140,4 @@ export default async function VerifyPage({
     </div>
   );
 }
+
