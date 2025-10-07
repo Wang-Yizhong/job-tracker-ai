@@ -143,7 +143,7 @@ export default function AuthPage() {
       }
 
       setVerifyEmail(values.email);
-      setCooldown(3);
+      setCooldown(60);
     } catch (err: any) {
       const status = err?.response?.status;
       const code = err?.response?.data?.code;

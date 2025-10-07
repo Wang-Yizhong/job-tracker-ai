@@ -39,7 +39,6 @@ function buildJobForMatrix(raw: ParsedJobRaw | null | undefined, textBlob: strin
   const tags = Array.isArray(raw?.tags) ? raw!.tags! : [];
   const reqsMixed = Array.isArray(raw?.requirements) ? raw!.requirements! : [];
   const skills = Array.isArray(raw?.skills) ? raw!.skills! : [];
-  console.log(raw,'看看这里传的对吗');
 
   // 1) 归一化 requirements
   let requirements: Requirement[] = reqsMixed
@@ -302,7 +301,6 @@ Nice: Stripe, Kubernetes, gRPC, MQTT, RabbitMQ, Grafana, OpenTelemetry
       fd.append("file", f);
 
       const upRes = await http.post<{ fileKey: string }>("/resumes/upload", fd);
-      console.log(upRes);
       const { fileKey } = upRes;
 
       const vRes = await http.post<{ id: string; fileKey: string; fileName: string }>(`/resumes/${seriesId}/versions`, {
