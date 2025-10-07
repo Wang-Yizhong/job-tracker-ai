@@ -5,7 +5,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import Topbar from "../../components/Topbar";
 import SummaryCard from "../../components/SummaryCard";
 import type { JobStatus } from "../../components/StatusBadge";
-import api from "@/lib/axios";
+import {http} from "@/lib/axios";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 
@@ -154,7 +154,7 @@ export default function DashboardPage() {
       setLoading(true);
       setErr(null);
       try {
-        const res = await api.get("/positions", { signal: controller.signal });
+        const res = await http.get("/positions", { signal: controller.signal });
 
         // 注意：axios 拦截器已返回 payload，这里不要使用 res.data
         const payload: any = res;

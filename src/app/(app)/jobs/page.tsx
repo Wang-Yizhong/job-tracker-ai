@@ -5,7 +5,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Pencil, Trash2, Sparkles } from "lucide-react";
 import JobForm, { JobFormValues, JobStatus } from "../../components/JobForm";
 import { useRouter } from "next/navigation";
-import api from "@/lib/axios";
+ import { http } from "@/lib/axios";
 import DataTable from "../../components/DataTable";
 import { ColumnDef } from "@tanstack/react-table";
 
@@ -31,7 +31,8 @@ async function listJobs(params: {
   status?: JobStatus | "all";
   sort?: string;
 }) {
-  return api.get<{ data: Job[]; total: number }>(API, {
+  // http.get<T> 会直接返回 T，这里 T = { data: Job[]; total: number }
+  const res = await http.get<{ data: Job[]; total: number }>(API, {
     params: {
       page: params.page,
       pageSize: params.pageSize,
@@ -40,17 +41,19 @@ async function listJobs(params: {
       sort: params.sort,
     },
   });
-}
-async function createJob(payload: JobFormValues) {
-  return api.post<Job>(API, payload);
-}
-async function updateJob(id: string, payload: JobFormValues) {
-  return api.put<Job>(`${API}/${id}`, payload);
-}
-async function removeJob(id: string) {
-  return api.delete<{ ok: true }>(`${API}/${id}`);
+  return res; // ✅ 不要再 .data
 }
 
+async function createJob(payload: JobFormValues) {
+  // 这里 res 已经是 Job
+  const res = await http.post<Job>(API, payload);
+  return res; // ✅ 不要再 .data
+}
+
+async function updateJob(id: string, payload: JobFormValues) {
+  const res = await http.put<Job>(`${API}/${id}`, payload);
+  return res; // ✅ 不要再 .data
+}
 // ===== Status Badge =====
 const statusLabel: Record<JobStatus, string> = {
   DRAFT: "Entwurf",
@@ -137,9 +140,10 @@ export default function JobsPage() {
     try {
       setLoading(true);
       setError(null);
-      const res = await listJobs({ page, pageSize, query, status, sort });
-      setRows(res.data);
-      setTotal(res.total);
+ const { data, total } =
+  await http.get<{ data: Job[]; total: number }>("/positions");
+setRows(data);
+setTotal(total);
     } catch (e: any) {
       setError(e?.message || "Laden fehlgeschlagen");
     } finally {
@@ -317,7 +321,7 @@ export default function JobsPage() {
     const backup = rows.slice();
     setRows((r) => r.filter((x) => x.id !== id));
     try {
-      await removeJob(id);
+      await http.delete<Job>(`${API}/${id}`);;
       setTotal((t) => Math.max(0, t - 1));
       setDeleteTarget(null);
       await load();

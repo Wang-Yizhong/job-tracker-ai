@@ -1,4 +1,4 @@
-// src/app/api/positions/[id]/route.ts
+// --- file: src/app/api/positions/[id]/route.ts
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -7,15 +7,15 @@ import { updatePositionSchema } from "@/lib/validation/position";
 
 export const runtime = "nodejs";
 
-// 读单条
+// GET /api/positions/[id]
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  ctx: { params: Promise<{ id: string }> }
 ) {
   const userId = await requireUserId();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { id } = params;
+  const { id } = await ctx.params;             // 👈 await
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
   const item = await prisma.position.findFirst({ where: { id, userId } });
@@ -24,15 +24,15 @@ export async function GET(
   return NextResponse.json(item);
 }
 
-// 更新
+// PUT /api/positions/[id]
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  ctx: { params: Promise<{ id: string }> }
 ) {
   const userId = await requireUserId();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { id } = params;
+  const { id } = await ctx.params;             // 👈 await
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
   const body = await req.json();
@@ -41,7 +41,6 @@ export async function PUT(
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  // 你的前端可能传 url 字段，数据库是 link 字段：做一下映射
   const { url, ...rest } = parsed.data as any;
   const data = { ...rest, ...(url !== undefined ? { link: url } : {}) };
 
@@ -52,15 +51,15 @@ export async function PUT(
   return NextResponse.json(updated);
 }
 
-// 删除
+// DELETE /api/positions/[id]
 export async function DELETE(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  ctx: { params: Promise<{ id: string }> }
 ) {
   const userId = await requireUserId();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { id } = params;
+  const { id } = await ctx.params;             // 👈 await
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
   const r = await prisma.position.deleteMany({ where: { id, userId } });

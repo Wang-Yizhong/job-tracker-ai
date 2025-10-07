@@ -6,17 +6,27 @@ import Image from "next/image";
 import type { ResumeData } from "@/types/resume";
 import type { MatchMatrix } from "./AnalysisPanel";
 import { Loader2, X, Send } from "lucide-react";
-import api from "@/lib/axios";
+import {http} from "@/lib/axios";
 
 type Props = {
   open: boolean;
   onClose: () => void;
   resume: ResumeData;
   match: MatchMatrix;
-  onApplyOptimized: (payload: { optimized: ResumeData; summaryDraft?: string; bulletDraft?: string }) => void;
+  onApplyOptimized: (payload: {
+    optimized: ResumeData;
+    summaryDraft?: string;
+    bulletDraft?: string;
+  }) => void;
 };
 
-type GapQuestion = { id: string; skill: string; must?: boolean; question: string; hint?: string };
+type GapQuestion = {
+  id: string;
+  skill: string;
+  must?: boolean;
+  question: string;
+  hint?: string;
+};
 
 const MAX_MESSAGES = 5;
 const MAX_CHARS = 500;
@@ -33,19 +43,31 @@ function pickFirstMissingSkill(match: any): string | null {
   return first?.skill || null;
 }
 
-export default function QuestionFlow({ open, onClose, resume, match, onApplyOptimized }: Props) {
+export default function QuestionFlow({
+  open,
+  onClose,
+  resume,
+  match,
+  onApplyOptimized,
+}: Props) {
   const [messages, setMessages] = useState<ChatViewMsg[]>([]);
   const [input, setInput] = useState("");
   const [left, setLeft] = useState(MAX_MESSAGES);
   const [busy, setBusy] = useState(false);
 
-  const [qa, setQA] = useState<{ questions: GapQuestion[]; answers: Record<string, string> }>({
+  const [qa, setQA] = useState<{
+    questions: GapQuestion[];
+    answers: Record<string, string>;
+  }>({
     questions: [],
     answers: {},
   });
   const seqRef = useRef(1);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
-  const firstMissingSkill = useMemo(() => pickFirstMissingSkill(match), [match]);
+  const firstMissingSkill = useMemo(
+    () => pickFirstMissingSkill(match),
+    [match]
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -97,11 +119,23 @@ export default function QuestionFlow({ open, onClose, resume, match, onApplyOpti
     if (!raw) return;
 
     if (raw.length < MIN_CHARS) {
-      setMessages((m) => [...m, { role: "coach", text: `Deine Antwort ist etwas knapp. Bitte füge noch ein paar Details hinzu (mind. ${MIN_CHARS} Zeichen).` }]);
+      setMessages((m) => [
+        ...m,
+        {
+          role: "coach",
+          text: `Deine Antwort ist etwas knapp. Bitte füge noch ein paar Details hinzu (mind. ${MIN_CHARS} Zeichen).`,
+        },
+      ]);
       return;
     }
     if (raw.length > MAX_CHARS) {
-      setMessages((m) => [...m, { role: "coach", text: `Deine Antwort ist recht lang (>${MAX_CHARS} Zeichen). Bitte kürze sie leicht.` }]);
+      setMessages((m) => [
+        ...m,
+        {
+          role: "coach",
+          text: `Deine Antwort ist recht lang (>${MAX_CHARS} Zeichen). Bitte kürze sie leicht.`,
+        },
+      ]);
       return;
     }
     if (looksLikeGibberish(raw)) {
@@ -109,8 +143,7 @@ export default function QuestionFlow({ open, onClose, resume, match, onApplyOpti
         ...m,
         {
           role: "coach",
-          text:
-            "Deine Antwort wirkt schwer verständlich. Versuch es bitte nochmal im STAR-Format mit **Ort/Zeit/Unternehmen, Rolle, Aktionen (Tools) und messbarem Ergebnis**. Du machst das super 👍",
+          text: "Deine Antwort wirkt schwer verständlich. Versuch es bitte nochmal im STAR-Format mit **Ort/Zeit/Unternehmen, Rolle, Aktionen (Tools) und messbarem Ergebnis**. Du machst das super 👍",
         },
       ]);
       return;
@@ -118,7 +151,10 @@ export default function QuestionFlow({ open, onClose, resume, match, onApplyOpti
     if (left <= 0) {
       setMessages((m) => [
         ...m,
-        { role: "coach", text: "Aktuell ist die Demo-Version limitiert. Du hast dein Nachricht-Kontingent erreicht. Danke für dein Verständnis!" },
+        {
+          role: "coach",
+          text: "Aktuell ist die Demo-Version limitiert. Du hast dein Nachricht-Kontingent erreicht. Danke für dein Verständnis!",
+        },
       ]);
       return;
     }
@@ -129,10 +165,16 @@ export default function QuestionFlow({ open, onClose, resume, match, onApplyOpti
     setBusy(true);
 
     try {
-      const apiDialog = toApiDialog(messages.concat([{ role: "user", text: raw }]));
-      const res = await api.post<{
+      const apiDialog = toApiDialog(
+        messages.concat([{ role: "user", text: raw }])
+      );
+      const res = await http.post<{
         ok: boolean;
-        message?: { role: "assistant"; content: string; meta?: { focusSkill?: string } };
+        message?: {
+          role: "assistant";
+          content: string;
+          meta?: { focusSkill?: string };
+        };
       }>("/ai/gap-questions", {
         resume,
         match,
@@ -141,26 +183,36 @@ export default function QuestionFlow({ open, onClose, resume, match, onApplyOpti
       });
 
       const assistantText = (res as any)?.message?.content?.trim?.() || "";
-      const focusSkill = (res as any)?.message?.meta?.focusSkill || firstMissingSkill || "Allgemein";
+      const focusSkill =
+        (res as any)?.message?.meta?.focusSkill ||
+        firstMissingSkill ||
+        "Allgemein";
 
       if (assistantText) {
         setMessages((m) => [...m, { role: "coach", text: assistantText }]);
       } else {
         setMessages((m) => [
           ...m,
-          { role: "coach", text: "Danke für deine Antwort! Falls du noch Zahlen oder Tools ergänzen kannst, wäre das perfekt." },
+          {
+            role: "coach",
+            text: "Danke für deine Antwort! Falls du noch Zahlen oder Tools ergänzen kannst, wäre das perfekt.",
+          },
         ]);
       }
 
       const id = `q${seqRef.current++}`;
-      const firstLine = assistantText.split(/\n+/)[0]?.slice(0, 120) || `Rückfrage zu ${focusSkill}`;
+      const firstLine =
+        assistantText.split(/\n+/)[0]?.slice(0, 120) ||
+        `Rückfrage zu ${focusSkill}`;
       const q: GapQuestion = { id, skill: focusSkill, question: firstLine };
       setQA((prev) => ({
         questions: [...prev.questions, q],
         answers: { ...prev.answers, [id]: raw },
       }));
     } catch (e: any) {
-      const msg = e?.message || "Die Anfrage ist fehlgeschlagen. Bitte versuche es später erneut.";
+      const msg =
+        e?.message ||
+        "Die Anfrage ist fehlgeschlagen. Bitte versuche es später erneut.";
       setMessages((m) => [...m, { role: "coach", text: msg }]);
     } finally {
       setBusy(false);
@@ -172,21 +224,32 @@ export default function QuestionFlow({ open, onClose, resume, match, onApplyOpti
       if (Object.keys(qa.answers).length === 0) {
         setMessages((m) => [
           ...m,
-          { role: "coach", text: "Noch keine Antwort vorhanden. Bitte beantworte mindestens eine Frage im STAR-Format, dann kann ich es in den Lebenslauf übernehmen." },
+          {
+            role: "coach",
+            text: "Noch keine Antwort vorhanden. Bitte beantworte mindestens eine Frage im STAR-Format, dann kann ich es in den Lebenslauf übernehmen.",
+          },
         ]);
         return;
       }
       setBusy(true);
+      const optimized: ResumeData = await http.post<ResumeData>(
+        "/ai/rewrite-resume",
+        {
+          resume,
+          questions: qa.questions,
+          answers: qa.answers,
+        }
+      );
 
-      const optimized: ResumeData = await api.post<ResumeData>("/ai/rewrite-resume", {
-        resume,
-        questions: qa.questions,
-        answers: qa.answers,
+      onApplyOptimized({
+        optimized,
+        summaryDraft: undefined,
+        bulletDraft: undefined,
       });
-
-      onApplyOptimized({ optimized, summaryDraft: undefined, bulletDraft: undefined });
     } catch (e: any) {
-      const msg = e?.message || "Die Optimierung konnte nicht erzeugt werden. Bitte versuche es später erneut.";
+      const msg =
+        e?.message ||
+        "Die Optimierung konnte nicht erzeugt werden. Bitte versuche es später erneut.";
       setMessages((m) => [...m, { role: "coach", text: msg }]);
     } finally {
       setBusy(false);
@@ -202,12 +265,22 @@ export default function QuestionFlow({ open, onClose, resume, match, onApplyOpti
         <div className="flex items-center justify-between border-b px-5 py-3">
           <div className="flex items-center gap-3">
             <div className="relative h-8 w-8 overflow-hidden rounded-full">
-              <Image src="/img/job-coach.png" alt="JOB Coach" fill className="object-contain" />
+              <Image
+                src="/img/job-coach.png"
+                alt="JOB Coach"
+                fill
+                className="object-contain"
+              />
             </div>
             <div className="text-sm font-semibold">JOB Coach</div>
-            <div className="text-xs text-muted">Verbleibend {left}/{MAX_MESSAGES}</div>
+            <div className="text-xs text-muted">
+              Verbleibend {left}/{MAX_MESSAGES}
+            </div>
           </div>
-          <button className="rounded-xl border px-2 py-1 text-sm hover:bg-muted/20" onClick={onClose}>
+          <button
+            className="rounded-xl border px-2 py-1 text-sm hover:bg-muted/20"
+            onClick={onClose}
+          >
             <X className="h-4 w-4" />
             <span className="sr-only">Schließen</span>
           </button>
@@ -216,12 +289,19 @@ export default function QuestionFlow({ open, onClose, resume, match, onApplyOpti
         {/* Chat */}
         <div className="max-h-[52vh] overflow-y-auto px-5 py-4 space-y-4">
           {messages.map((m, i) =>
-            m.role === "coach" ? <CoachBubble key={i} text={m.text} /> : <UserBubble key={i} text={m.text} />
+            m.role === "coach" ? (
+              <CoachBubble key={i} text={m.text} />
+            ) : (
+              <UserBubble key={i} text={m.text} />
+            )
           )}
           {busy && (
             <div className="flex items-start gap-3">
               <CoachAvatar />
-              <div className="rounded-2xl border px-4 py-3 bg-[#EEF0FF] text-[#2D2A8C]" style={{ borderColor: "rgba(80,72,229,0.22)" }}>
+              <div
+                className="rounded-2xl border px-4 py-3 bg-[#EEF0FF] text-[#2D2A8C]"
+                style={{ borderColor: "rgba(80,72,229,0.22)" }}
+              >
                 <Loader2 className="mr-2 inline h-4 w-4 animate-spin" />
                 Denke nach …
               </div>
@@ -232,8 +312,13 @@ export default function QuestionFlow({ open, onClose, resume, match, onApplyOpti
         {/* Footer */}
         <div className="border-t px-5 py-3">
           <div className="mb-2 flex items-center justify-between text-xs text-muted">
-            <span>💡 Tipp: STAR + Ort/Zeit/Unternehmen + Aktion + Ergebnis (mit Zahlen). Mind. {MIN_CHARS} Zeichen.</span>
-            <span>Verbleibend: <strong>{left}</strong> / {MAX_MESSAGES}</span>
+            <span>
+              💡 Tipp: STAR + Ort/Zeit/Unternehmen + Aktion + Ergebnis (mit
+              Zahlen). Mind. {MIN_CHARS} Zeichen.
+            </span>
+            <span>
+              Verbleibend: <strong>{left}</strong> / {MAX_MESSAGES}
+            </span>
           </div>
 
           <div className="flex items-end gap-3">
@@ -241,7 +326,9 @@ export default function QuestionFlow({ open, onClose, resume, match, onApplyOpti
               <textarea
                 ref={inputRef}
                 className={`min-h-[44px] max-h-[160px] w-full resize-y rounded-2xl border bg-background p-3 text-sm outline-none ${
-                  belowMin ? "border-red-300 focus:ring-1 focus:ring-red-300" : "border-border"
+                  belowMin
+                    ? "border-red-300 focus:ring-1 focus:ring-red-300"
+                    : "border-border"
                 }`}
                 placeholder={`Antwort hier eingeben … (min. ${MIN_CHARS}, max. ${MAX_CHARS} Zeichen, Shift+Enter = Zeilenumbruch)`}
                 value={input}
@@ -260,10 +347,14 @@ export default function QuestionFlow({ open, onClose, resume, match, onApplyOpti
               <div className="mt-1 flex items-center justify-between text-[11px] text-muted">
                 <span className={`${belowMin ? "text-red-500" : ""}`}>
                   {input.trim().length < MIN_CHARS
-                    ? `Noch ${MIN_CHARS - Math.max(0, input.trim().length)} Zeichen notwendig`
+                    ? `Noch ${
+                        MIN_CHARS - Math.max(0, input.trim().length)
+                      } Zeichen notwendig`
                     : "Mindestlänge erreicht 🎉"}
                 </span>
-                <span>{input.length}/{MAX_CHARS}</span>
+                <span>
+                  {input.length}/{MAX_CHARS}
+                </span>
               </div>
             </div>
 
@@ -297,7 +388,12 @@ export default function QuestionFlow({ open, onClose, resume, match, onApplyOpti
 function CoachAvatar() {
   return (
     <div className="relative h-8 w-8 overflow-hidden rounded-full">
-      <Image src="/img/job-coach.png" alt="JOB Coach" fill className="object-contain" />
+      <Image
+        src="/img/job-coach.png"
+        alt="JOB Coach"
+        fill
+        className="object-contain"
+      />
     </div>
   );
 }
@@ -306,7 +402,10 @@ function CoachBubble({ text }: { text: string }) {
   return (
     <div className="flex items-start gap-3">
       <CoachAvatar />
-      <div className="max-w-[75%] rounded-2xl px-4 py-3 bg-[#EEF0FF] text-[#2D2A8C] border shadow-sm" style={{ borderColor: "rgba(80,72,229,0.22)" }}>
+      <div
+        className="max-w-[75%] rounded-2xl px-4 py-3 bg-[#EEF0FF] text-[#2D2A8C] border shadow-sm"
+        style={{ borderColor: "rgba(80,72,229,0.22)" }}
+      >
         <p className="whitespace-pre-wrap text-sm leading-relaxed">{text}</p>
       </div>
     </div>

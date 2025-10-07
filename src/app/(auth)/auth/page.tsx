@@ -1,3 +1,4 @@
+// --- file: src/app/(auth)/auth/page.tsx
 "use client";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -5,7 +6,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import AnnouncementBar from "../../components/AnnouncementBar";
 import DemoAccountCard from "../../components/DemoAccountCard";
-import api from "@/lib/axios"; // ✅ 统一使用封装的 axios
+import {http} from "@/lib/axios"; // ✅ 统一使用封装的 axios
 
 // ---------- Validation Schemas (German messages) ----------
 const loginSchema = z.object({
@@ -17,7 +18,9 @@ const loginSchema = z.object({
 const registerSchema = z.object({
   email: z.string().trim().toLowerCase().email({ message: "Bitte gib eine gültige E-Mail-Adresse ein." }),
   password: z.string().min(8, { message: "Das Passwort muss mindestens 8 Zeichen haben." }),
-  acceptTos: z.literal(true, { errorMap: () => ({ message: "Bitte stimme zuerst den Bedingungen zu." }) }),
+  acceptTos: z
+    .boolean()
+    .refine((v) => v === true, { message: "Bitte stimme zuerst den Bedingungen zu." }),
 });
 
 // ---------- Types ----------
@@ -108,10 +111,10 @@ export default function AuthPage() {
     }
   }, []);
 
-  // Login submit  ✅ 改为 api.post
+  // Login submit  ✅ 使用 .data
   async function onSubmitLogin(values: LoginValues) {
     try {
-      await api.post("/login", values);
+      await http.post("/login", values).then((res) => res);
       window.location.assign("/dashboard");
     } catch (err: any) {
       const msg = err?.response?.data?.error || err?.message || "Anmeldung fehlgeschlagen.";
@@ -119,13 +122,14 @@ export default function AuthPage() {
     }
   }
 
-  // Registrieren submit  ✅ 改为 api.post（含已存在逻辑）
+  // Registrieren submit  ✅ 使用 .data
   async function onSubmitRegister(values: RegisterValues) {
     try {
       lastRegisterRef.current = values;
       const payload = { email: values.email, password: values.password };
 
-      const data = await api.post("/register", payload);
+      const res = await http.post<{ alreadyVerified?: boolean }>("/register", payload);
+      const data = res;
 
       if (data?.alreadyVerified) {
         setMode("login");
@@ -166,11 +170,11 @@ export default function AuthPage() {
     return () => clearInterval(timer);
   }, [cooldownActive]);
 
-  // Verifizierungsmail erneut senden  ✅ 改为 api.post
+  // Verifizierungsmail erneut senden  ✅ 使用 .data
   async function handleResend() {
     if (!verifyEmail || cooldownActive) return;
     try {
-      await api.post("/resend-verify", { email: verifyEmail });
+      await http.post("/resend-verify", { email: verifyEmail }).then((res) => res);
       setCooldown(60);
     } catch (e) {
       setCooldown(60);
@@ -349,7 +353,8 @@ export default function AuthPage() {
               <label className="flex items-start gap-2 text-sm text-gray-700">
                 <input type="checkbox" {...registerRegister("acceptTos")} className="mt-1 h-4 w-4" />
                 <span>
-                  Ich stimme den <AppLink className="text-primary-600 hover:underline" href="#">
+                  Ich stimme den{" "}
+                  <AppLink className="text-primary-600 hover:underline" href="#">
                     AGB
                   </AppLink>{" "}
                   und der{" "}

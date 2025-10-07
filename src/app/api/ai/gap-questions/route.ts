@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { openai, OPENAI_MODEL } from "@/lib/openai";
 import type { ResumeData } from "@/types/resume";
 import { incMonthlyGlobal } from "@/lib/quota";
+import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 
 export const runtime = "nodejs";
 
@@ -83,17 +84,20 @@ export async function POST(req: Request) {
     const focus = pickFocusSkill(match);
     const system = buildSystemPrompt(focus || undefined);
 
-    const history = (dialog || []).slice(-8).map(m => ({
-      role: m.role === "assistant" || m.role === "system" ? m.role : "user",
-      content: (m.content || "").slice(0, 1200),
-    }));
+    // 将历史消息显式收窄为 SDK 允许的角色，并限制长度
+    const historyMsgs: ChatCompletionMessageParam[] = (dialog || [])
+      .slice(-8)
+      .map((m): ChatCompletionMessageParam => ({
+        role: m.role, // 已经是 "system" | "user" | "assistant"
+        content: (m.content || "").slice(0, 1200),
+      }));
 
     const userContent = [
       "KURZ-CONTEXT:",
       JSON.stringify({ resume: briefResume(resume), match: briefMatch(match) }, null, 2),
       "",
       "BISHERIGER DIALOG (gekürzt):",
-      JSON.stringify(history, null, 2),
+      JSON.stringify(historyMsgs.map(({ role, content }) => ({ role, content })), null, 2),
       "",
       "NEUE NACHRICHT DES NUTZERS:",
       userInput.slice(0, 1600),
@@ -104,13 +108,15 @@ export async function POST(req: Request) {
       "- Wenn Infos ausreichend → kurze Zusammenfassung + nächste konkrete Ergänzung (Zahlen/Tools).",
     ].join("\n");
 
+    const messages: ChatCompletionMessageParam[] = [
+      { role: "system", content: system },
+      ...historyMsgs,
+      { role: "user", content: userContent },
+    ];
+
     const completion = await openai.chat.completions.create({
       model: OPENAI_MODEL,
-      messages: [
-        { role: "system", content: system },
-        ...history,
-        { role: "user", content: userContent },
-      ],
+      messages,
       temperature: 0.3,
       max_tokens: 350,
     });

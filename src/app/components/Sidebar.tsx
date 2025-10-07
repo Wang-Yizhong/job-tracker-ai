@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { LogOut, User, LayoutDashboard, Briefcase, FileText,Bell } from "lucide-react";
-import api from "@/lib/axios";
+import {http} from "@/lib/axios";
 
 type Me =
   | {
@@ -37,7 +37,7 @@ export default function Sidebar() {
     let cancelled = false;
     (async () => {
       try {
-        const data = await api.get<{ user: Me }>("/userInfo", {
+        const data = await http.get<{ user: Me }>("/userInfo", {
           headers: { "Cache-Control": "no-store" },
         });
         if (!cancelled) setMe(data?.user ?? null);
@@ -54,7 +54,7 @@ export default function Sidebar() {
 
   const handleLogout = async () => {
     try {
-      await api.post("/logout");
+      await http.post("/logout");
       router.push("/auth");
     } catch (err: any) {
       console.error("Logout error:", err);

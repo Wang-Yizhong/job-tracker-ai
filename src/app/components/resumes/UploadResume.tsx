@@ -2,7 +2,7 @@
 "use client";
 import React, { useCallback, useRef, useState } from "react";
 import { Upload, CheckCircle2, FileText, X } from "lucide-react";
-import api from "@/lib/axios"; // ✅ 统一使用封装的 axios
+import {http} from "@/lib/axios"; // ✅ 统一使用封装的 axios
 
 export type UploadResumeProps = {
   /** 上传成功回调：返回 fileKey 和文件名 */
@@ -104,7 +104,7 @@ export default function UploadResume({
       fd.append("file", file);
 
       // ✅ 统一走 api 封装
-      const data= await api.post<{ fileKey: string }>(
+      const data= await http.post<{ fileKey: string }>(
         "/resumes/upload",
         fd
         // 不要显式设置 Content-Type；让 Axios 自动设置 multipart/form-data 边界

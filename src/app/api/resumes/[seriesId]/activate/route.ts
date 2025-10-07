@@ -1,5 +1,5 @@
 // --- file: src/app/api/resumes/[seriesId]/activate/route.ts
-import type { NextRequest, RouteContext } from "next/server";
+import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { cookies } from "next/headers";
@@ -10,44 +10,50 @@ export const runtime = "nodejs";
 /**
  * POST /api/resumes/:seriesId/activate
  * body: { versionId: string }
- * 将指定 version 设为该系列的 activeVersionId
  */
 export async function POST(
   req: NextRequest,
-  { params }: RouteContext<{ seriesId: string }>
+  ctx: { params: Promise<{ seriesId: string }> }
 ) {
   try {
-    const cookieStore = await cookies(); // Next 15 路由里使用 await OK
+    // ✅ 在你的类型环境下需要 await
+    const cookieStore = await cookies();
     const token = cookieStore.get(cookieName)?.value;
     const session = token ? verifySessionValue(token) : null;
     if (!session) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    const { versionId } = await req.json();
-    const { seriesId } = params;
+    const { seriesId } = await ctx.params; // ✅ params 也是 Promise，继续 await
+    if (!seriesId) {
+      return NextResponse.json({ error: "Missing seriesId" }, { status: 400 });
+    }
 
+    const { versionId } = await req.json();
     if (!versionId || typeof versionId !== "string") {
       return NextResponse.json({ error: "versionId required" }, { status: 400 });
     }
 
-    // 校验：version 属于该 series，且 series 属于当前用户
+    // 校验归属
     const exists = await prisma.resumeVersion.findFirst({
-      where: {
-        id: versionId,
-        seriesId,
-        series: { userId: session.uid },
-      },
+      where: { id: versionId, seriesId, series: { userId: session.uid } },
       select: { id: true },
     });
     if (!exists) {
       return NextResponse.json({ error: "Version not found" }, { status: 404 });
     }
 
-    // 更新 activeVersionId（这里默认你在 Prisma 中允许用 {id, userId} 作为唯一 where；否则可以先 findFirst 再用 update）
-    const updated = await prisma.resumeSeries.update({
+    // 防越权更新
+    const r = await prisma.resumeSeries.updateMany({
       where: { id: seriesId, userId: session.uid },
-      data: { activeVersionId: versionId },
+      data: { activeVersionId: versionId, updatedAt: new Date() },
+    });
+    if (r.count === 0) {
+      return NextResponse.json({ error: "Series not found" }, { status: 404 });
+    }
+
+    const updated = await prisma.resumeSeries.findFirst({
+      where: { id: seriesId, userId: session.uid },
       include: {
         activeVersion: true,
         versions: { orderBy: { uploadedAt: "desc" } },

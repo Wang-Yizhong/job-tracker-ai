@@ -17,7 +17,7 @@ model User {
   emailVerified DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
-
+  name      String?
   positions          Position[]
   verificationTokens VerificationToken[] @relation("UserVerificationTokens")
   resumeSeries       ResumeSeries[]

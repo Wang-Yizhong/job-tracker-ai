@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import type { ResumeData } from "@/types/resume";
 import { openai, OPENAI_MODEL } from "@/lib/openai";
 import { incMonthlyGlobal } from "@/lib/quota";
+import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 
 export const runtime = "nodejs";
 
@@ -90,30 +91,34 @@ export async function POST(req: Request) {
     );
 
     const system = "Du bist ein Lebenslauf-Assistent. Antworte ausschließlich auf Deutsch und ausschließlich als JSON.";
-    const userPrompt = [
-      "Du bekommst Stichworte und einen ggf. vorhandenen bisherigen Summary-Text.",
-      "Deine Aufgabe: Formuliere eine kurze, prägnante Summary (2–3 Sätze), passend für Bewerbungen in Deutschland.",
-      "WICHTIG:",
-      "- Keine neuen Fakten erfinden (keine neuen Firmen, Zeiten, Rollen, Zahlen).",
-      "- Schreib sachlich, ergebnisorientiert; nenne Schwerpunkte/Stack, aber keine Buzzword-Listen.",
-      "- Maximale Länge ~ 420 Zeichen.",
-      'Gib ausschließlich folgendes JSON zurück: {"summary":"..."}',
-      "",
-      `Bisheriger Summary-Text: ${JSON.stringify(optimized.summary || "")}`,
-      `Schwerpunkte/Stack: ${JSON.stringify(skillsFocus)}`
-    ].join("\n");
+    const userPrompt =
+      [
+        "Du bekommst Stichworte und einen ggf. vorhandenen bisherigen Summary-Text.",
+        "Deine Aufgabe: Formuliere eine kurze, prägnante Summary (2–3 Sätze), passend für Bewerbungen in Deutschland.",
+        "WICHTIG:",
+        "- Keine neuen Fakten erfinden (keine neuen Firmen, Zeiten, Rollen, Zahlen).",
+        "- Schreib sachlich, ergebnisorientiert; nenne Schwerpunkte/Stack, aber keine Buzzword-Listen.",
+        "- Maximale Länge ~ 420 Zeichen.",
+        'Gib ausschließlich folgendes JSON zurück: {"summary":"..."}',
+        "",
+        `Bisheriger Summary-Text: ${JSON.stringify(optimized.summary || "")}`,
+        `Schwerpunkte/Stack: ${JSON.stringify(skillsFocus)}`
+      ].join("\n");
 
     let summaryDraft = "";
     try {
+      const messages: ChatCompletionMessageParam[] = [
+        { role: "system", content: system },
+        { role: "user", content: userPrompt },
+      ];
+
       const r = await openai.chat.completions.create({
         model: OPENAI_MODEL,
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: userPrompt }
-        ],
+        messages,
         temperature: 0.2,
-        response_format: { type: "json_object" },
-        max_tokens: 300
+        // 注意：某些 SDK 版本对 chat.completions 的 response_format 类型较严格
+        // 为保证兼容，移除 response_format，靠提示词保证 JSON 输出
+        max_tokens: 300,
       });
 
       const raw = r.choices?.[0]?.message?.content || "{}";

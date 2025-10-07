@@ -7,55 +7,106 @@ import ResumeHistory from "../../components/resumes/ResumeHistory";
 import ResumeA4Editor from "../../components/resumes/ResumeA4Editor";
 import AnalysisPanel, { MatchMatrix } from "../../components/resumes/AnalysisPanel";
 import QuestionFlow from "../../components/resumes/QuestionFlow";
-import api from "@/lib/axios";
+import {http} from "@/lib/axios";
 import type { ResumeData } from "@/types/resume";
 
-/* =================== Helpers & APIs =================== */
+/* =================== Helpers & Types =================== */
+type Requirement = { text: string; group: string; must?: boolean; weight?: number; raw?: string };
+type ParsedJobRaw = { skills?: string[]; tags?: string[]; requirements?: (Requirement | string)[]; [k: string]: any };
+
+/** 兼容 /resumes/parse 的各种返回形状，并兜底 skills=[] */
+function safeUnwrapResume(res: any): ResumeData {
+  const raw = res?.data ?? res;
+  const resumeObj = raw?.resume ?? raw?.data ?? raw;
+  if (!resumeObj || typeof resumeObj !== "object") throw new Error("Parser lieferte kein gültiges Resume-Objekt");
+  if (!Array.isArray(resumeObj.skills)) resumeObj.skills = [];
+  return resumeObj as ResumeData;
+}
+
+/** 极简兜底关键词（仅当 parse-job 没产出时，保证 job 不为空） */
+function extractKeywordsFallback(text: string): string[] {
+  return String(text || "")
+    .toLowerCase()
+    .replace(/[(){}\[\],:;'"“”‘’]/g, " ")
+    .split(/[^a-z0-9#+.\-]/g) // 保留 C++ / C# / .NET / tailwindcss 等
+    .filter(Boolean)
+    .filter((w) => w.length >= 2)
+    .slice(0, 40);
+}
+
+/** 把 parse-job 的返回统一成 match-matrix 需要的 job：保证 requirements 非空且 group="Tech" */
+function buildJobForMatrix(raw: ParsedJobRaw | null | undefined, textBlob: string) {
+  const tags = Array.isArray(raw?.tags) ? raw!.tags! : [];
+  const reqsMixed = Array.isArray(raw?.requirements) ? raw!.requirements! : [];
+  const skills = Array.isArray(raw?.skills) ? raw!.skills! : [];
+  console.log(raw,'看看这里传的对吗');
+
+  // 1) 归一化 requirements
+  let requirements: Requirement[] = reqsMixed
+    .map((r: any) =>
+      typeof r === "string"
+        ? { text: r, group: "Tech" }
+        : {
+            text: String(r?.text ?? r?.raw ?? "").trim(),
+            group: r?.group ?? "Tech",
+            must: r?.must,
+            weight: r?.weight,
+            raw: r?.raw,
+          }
+    )
+    .filter((r) => r.text);
+
+  // 2) 若为空，用 tags/skills 填充
+  if (requirements.length === 0) {
+    const base = [...tags, ...skills].map((t) => String(t).trim()).filter(Boolean);
+    requirements = base.map((t) => ({ text: t, group: "Tech" }));
+  }
+
+  // 3) 还为空：用 JD 文本提关键词兜底
+  if (requirements.length === 0) {
+    const kw = extractKeywordsFallback(textBlob);
+    requirements = kw.map((t) => ({ text: t, group: "Tech" }));
+  }
+
+  // 4) 去重（按小写文本）
+  const seen = new Set<string>();
+  requirements = requirements.filter((r) => {
+    const k = r.text.toLowerCase();
+    if (!k || seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+
+  return { ...(raw ?? {}), requirements, skills };
+}
+
+/* -------- API helpers -------- */
 async function getSignedUrlByFileKey(fileKey: string): Promise<string> {
-  try {
-    const data = await api.post<{ url: string }>("/resumes/sign", { fileKey });
-    if (!data?.url) throw new Error("Signierte URL fehlt im Response");
-    return data.url;
-  } catch (err: any) {
-    throw new Error(err?.response?.data?.error || err?.message || "Signierte URL konnte nicht erstellt werden");
-  }
+  const res = await http.post<{ url: string }>("/resumes/sign", { fileKey });
+  const  url  = res.url;
+  if (!url) throw new Error("Signierte URL fehlt im Response");
+  return url;
 }
 
-async function parseJob(text: string) {
-  try {
-    const data = await api.post("/parse-job", { text });
-    return data;
-  } catch (err: any) {
-    throw new Error(err?.response?.data?.error || err?.message || "Stellenbeschreibung konnte nicht geparst werden");
-  }
+ async function parseJob(text: string): Promise<ParsedJobRaw | null> {
+  const res = await http.post<ParsedJobRaw | null>("/parse-job", { text });
+  return res;
 }
 
-async function buildMatchMatrix(job: any, resumeSkills: string[]) {
-  try {
-    const data = await api.post("/match-matrix", {
-      job,
-      resume: { skills: resumeSkills },
-    });
-    return data;
-  } catch (err: any) {
-    throw new Error(err?.response?.data?.error || err?.message || "Match-Matrix konnte nicht erstellt werden");
-  }
+async function callMatchMatrix(job: any, resumeSkills: string[]) {
+  const res = await http.post("/match-matrix", { job, resume: { skills: resumeSkills } });
+  return res;
 }
 
 async function requestAiSuggestion(section: string, text: string, jobContext?: string) {
-  try {
-    const data = await api.post<{ suggestion?: string }>("/ai/suggest", { section, text, jobContext });
-    return (data?.suggestion ?? "").trim();
-  } catch (err: any) {
-    throw new Error(err?.response?.data?.error || err?.message || "Vorschlag fehlgeschlagen");
-  }
+  const res = await http.post<{ suggestion?: string }>("/ai/suggest", { section, text, jobContext });
+  return (res?.suggestion ?? "").trim();
 }
 
 /* ============== JD Plausibilitätscheck ============== */
 function isLikelyJobDescription(text: string): { ok: boolean; reason?: string } {
   const t = text.replace(/\s+/g, " ").trim();
-  if (t.length < 100)
-    return { ok: false, reason: "Bitte gib mindestens 100 Zeichen ein." };
+  if (t.length < 100) return { ok: false, reason: "Bitte gib mindestens 100 Zeichen ein." };
   const keywords = [
     /aufgaben|anforderungen|verantwortung|profil|wir bieten|deine mission/i,
     /requirements|responsibilities|your tasks|what you will do/i,
@@ -63,13 +114,7 @@ function isLikelyJobDescription(text: string): { ok: boolean; reason?: string } 
     /react|vue|angular|node|typescript|graphql|java|python|sql|docker|kubernetes/i,
   ];
   const hit = keywords.some((re) => re.test(t));
-  if (!hit) {
-    return {
-      ok: false,
-      reason:
-        "Der Text wirkt nicht wie eine echte Stellenbeschreibung (fehlende typische Schlüsselwörter/Technologien).",
-    };
-  }
+  if (!hit) return { ok: false, reason: "Der Text wirkt nicht wie eine echte Stellenbeschreibung (fehlende typische Schlüsselwörter/Technologien)." };
   return { ok: true };
 }
 
@@ -96,11 +141,7 @@ export default function ResumePage() {
   const [seriesLang, setSeriesLang] = useState<string>("de");
 
   const [showQA, setShowQA] = useState(false);
-
-  const historyRef = useRef<Record<string, string[]>>({});
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-
-  // ⭐ 新增：mock pdf url 状态
   const [mockUrl, setMockUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -114,17 +155,12 @@ export default function ResumePage() {
     } catch {}
   }, []);
 
-  function handlePick(p: {
-    seriesId: string;
-    versionId: string;
-    fileKey: string;
-    fileName: string;
-  }) {
+  function handlePick(p: { seriesId: string; versionId: string; fileKey: string; fileName: string }) {
     setSeriesId(p.seriesId);
     setVersionId(p.versionId);
     setFileKey(p.fileKey);
     setFilename(p.fileName);
-    setMockUrl(null); // 一旦选择真实版本，清掉 mock
+    setMockUrl(null);
   }
 
   async function previewCurrent() {
@@ -144,8 +180,8 @@ export default function ResumePage() {
   const jdCheck = isLikelyJobDescription(jobContext || "");
   const canAnalyze = Boolean((fileKey || mockUrl) && jdCheck.ok);
 
+  /** ✅ 关键：保证 setMatch 传入的是“后端的真实数据”，且 job 不为空 */
   async function handleAnalyze() {
-    // 对真实与模拟两种情况统一处理
     const isMock = fileKey === "MOCK";
     if (!isMock && (!fileKey || !versionId)) {
       setValidMsg("Bitte wähle links eine Lebenslauf-Version.");
@@ -159,39 +195,38 @@ export default function ResumePage() {
     setValidMsg("");
     setLoading(true);
     try {
-      // 1) 获取简历可访问 URL
-      const signedUrl = isMock
-        ? (mockUrl as string)
-        : await getSignedUrlByFileKey(fileKey!);
-
-      // 2) 解析简历
-      const parsed = await api.post("/resumes/parse", {
+      // 1) 简历解析
+      const signedUrl = isMock ? (mockUrl as string) : await getSignedUrlByFileKey(fileKey!);
+      const parsedResumeResp = await http.post("/resumes/parse", {
         url: signedUrl,
         filename: isMock ? "mock.pdf" : filename,
         versionId: isMock ? "mock-version" : versionId,
       });
-      const resumeData: ResumeData = (parsed as any)?.data ?? parsed;
+      const resumeData = safeUnwrapResume(parsedResumeResp);
+      const resumeSkills: string[] = Array.isArray(resumeData.skills) ? resumeData.skills : [];
       setResume(resumeData);
 
-      // 3) 解析 JD
-      const parsedJob = await parseJob(jobContext);
-      setJobParsed(parsedJob);
+      // 2) JD 解析 + 归一化为 matrix 需要的 job（保证 requirements 非空）
+      const parsedJobRaw = await parseJob(jobContext);
+      const jobForMatrix = buildJobForMatrix(parsedJobRaw, jobContext);
+      setJobParsed(jobForMatrix);
 
-      // 4) 构建匹配矩阵
-      const mm = await buildMatchMatrix(parsedJob, resumeData.skills || []);
-      const normalized: MatchMatrix = {
-        total: mm?.total ?? (mm?.rows?.length ?? 0),
-        covered: mm?.covered ?? (mm?.rows?.filter((r: any) => r.state === "hit")?.length ?? 0),
-        rows: (mm?.rows ?? []).map((r: any) => ({
-          skill: r.skill,
-          state: r.state,
-          must: r.must,
-          suggestion: r.suggestion,
-        })),
+      // 3) 调用 /api/match-matrix —— 不再做二次映射，直接使用后端返回
+   const mm = (await callMatchMatrix(jobForMatrix, resumeSkills)) as any;
+
+      // ✅ 直接传后端结构给 AnalysisPanel（仅做轻微兜底）
+      const uiMatch: MatchMatrix = {
+        total: typeof mm?.total === "number" ? mm.total : Array.isArray(mm?.rows) ? mm.rows.length : 0,
+        covered:
+          typeof mm?.covered === "number"
+            ? mm.covered
+            : Array.isArray(mm?.rows)
+            ? mm.rows.filter((r: any) => r?.state === "hit").length
+            : 0,
+        rows: Array.isArray(mm?.rows) ? mm.rows : [],
       };
-      setMatch(normalized);
-
-      setStep(2);
+      setMatch(uiMatch);
+      setStep(2); // 确保跳到分析页
     } catch (e: any) {
       alert(e?.response?.data?.error || e?.message || "Analyse fehlgeschlagen");
     } finally {
@@ -199,78 +234,28 @@ export default function ResumePage() {
     }
   }
 
-  // ⭐ 新增：使用模拟数据（填充 JD 并自动分析）
+  // Mock 数据
   function handleUseMock() {
     const url =
       "https://tyvshioiuupglckpvgxu.supabase.co/storage/v1/object/sign/resumes/cmfnydtfy0003v9z4iva6cjni/resumes/de/e36de01c-3ee8-4fef-980a-06db58ea055e.pdf?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV8zN2Q1NmYxMS02MTk1LTRjZjgtYmJmZi04MGY1YmEwZDhjZWQiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJyZXN1bWVzL2NtZm55ZHRmeTAwMDN2OXo0aXZhNmNqbmkvcmVzdW1lcy9kZS9lMzZkZTAxYy0zZWU4LTRmZWYtOTgwYS0wNmRiNThlYTA1NWUucGRmIiwiaWF0IjoxNzU5MTYwODY2LCJleHAiOjE3OTA2OTY4NjZ9.7RijvDpLz9WC6Y1ascCFBW3mPH5qcIZxWbdu6RSwl3A";
 
-    // 原文替换 bace -> ABC（大小写、所有格）
     const rawJD = `
-Vollständige Stellenbeschreibung
-Full Stack
-Full Time
-Offices in Dortmund and Berlin
-Remote (based in Germany or within Europe) or hybrid
-All Genders
-English, optional German
-Start: asap
-
-HEY!!
-
-Want to shape the future of urban logistics and redefine local shopping for retailers, brands, and consumers? Yes?! Then you're in the right place to make a difference!
-
-About bace
-
-At bace, we’re not just another parcel locker - we’re building the future of urban logistics with a fully agnostic, multi-service hub network. Our smart hubs consolidate logistics, support local commerce, and create a seamless experience for retailers, brands, and consumers alike.
-
-Here’s a snapshot of our recent milestones:
-
-€3M+ funding secured & backed by strategic investors (including key players from retail & logistics)
-Successfully tested our first hub in front of the BVB Stadium over 10 months in 23/24
-Market launch in the beginning of Q3 2025 with major partners
-Exclusive partnership with Pickshare to launch One Delivery - a game-changer in bundled last-mile deliveries
-Real-world impact because our hubs aren’t just empty boxes - they revolutionize last-mile logistics with a seamless user experience, consolidating deliveries to reduce traffic, cut emissions, and create greener, more livable cities.
-This is your chance to be part of a startup that’s moving fast, scaling smart, and transforming urban logistics from the ground up. Join us!
-
-Responsibilities & Tasks as a Full Stack Dev. @ bace
-
-As our Full Stack Developer, you’ll play a key role in building and maintaining the platform that powers bace’s smart logistics hubs. You’ll work across both the backend and frontend, ensuring that our platform delivers exceptional performance, scalability, and user experience.
-
-What You’ll Do
-
-Build and Scale: Develop and maintain both backend and frontend components of our platform.
-Collaborate: Work closely with product and engineering teams to define, design, and implement new features.
-Optimize Performance: Monitor system performance, identify bottlenecks, and make improvements.
-Ensure Quality: Write clean, maintainable code and perform code reviews to ensure best practices.
-Troubleshoot: Identify and resolve issues related to backend, frontend, and infrastructure.
-Fact: We need your skills
-
-Backend (min. 3 years): Experience with microservices & backend web applications, event sourcing, event driven architecture, task queues and distributed systems.
-Required: Rust, Postgres, GraphQL
-Nice to have: Stripe, Kubernetes, gRPC, MQTT, RabbitMQ, Grafana, Opentelemetry
-
-Frontend (min. 1-2 years): Experience in Mobile App & Web development
-Required: Typescript, React, TailwindCSS, Relay
-Nice to have: Stripe, ShadCN, Tanstack, Zustand, Capacitor, BetterAuth
+Full Stack · Remote/Hybrid
+Responsibilities: build & scale backend/frontend, collaborate, optimize performance, ensure quality, troubleshoot
+Backend: Rust, Postgres, GraphQL (event-driven, microservices)
+Frontend: Typescript, React, TailwindCSS, Relay
+Nice: Stripe, Kubernetes, gRPC, MQTT, RabbitMQ, Grafana, OpenTelemetry
     `.trim();
 
-    const jdABC = rawJD
-      .replace(/bace’s/gi, "ABC’s")
-      .replace(/bace/gi, "ABC")
-      .replace(/About ABC/i, "About ABC") // 保持标题正确
-      .replace(/@ ABC/i, "@ ABC");
-
-    // 设置 Mock 状态：标记 fileKey/versionId 为 MOCK，存入 mockUrl
     setFileKey("MOCK");
     setVersionId("MOCK");
     setFilename("mock.pdf");
     setMockUrl(url);
-    setJobContext(jdABC);
+    setJobContext(rawJD);
     setValidMsg("");
 
-    // 直接触发分析（等待 React 应用 state，再调用）
     setTimeout(() => {
-      setStep(1); // 确保停留在 Step 1 的 UI 也可以
+      setStep(1);
       handleAnalyze();
     }, 0);
   }
@@ -278,18 +263,13 @@ Nice to have: Stripe, ShadCN, Tanstack, Zustand, Capacitor, BetterAuth
   async function confirmCreateSeries() {
     const title = seriesTitle.trim();
     if (!title) return;
-
     try {
-      const created = await api.post<{ id: string }>("/resumes", {
-        title,
-        language: seriesLang || null,
-      });
-
+      const res = await http.post<{ id: string }>("/resumes", { title, language: seriesLang || null });
+      const  id  = res.id;
       setShowSeriesModal(false);
       setSeriesTitle("");
       setSeriesLang("de");
-
-      setSeriesId(created.id);
+      setSeriesId(id);
       setVersionId(null);
       setFileKey(null);
       setFilename(undefined);
@@ -320,16 +300,20 @@ Nice to have: Stripe, ShadCN, Tanstack, Zustand, Capacitor, BetterAuth
     try {
       const fd = new FormData();
       fd.append("file", f);
-      const upData = await api.post<{ fileKey: string }>("/resumes/upload", fd);
 
-      const vData = await api.post<{ id: string; fileKey: string; fileName: string }>(`/resumes/${seriesId}/versions`, {
-        fileKey: upData.fileKey,
+      const upRes = await http.post<{ fileKey: string }>("/resumes/upload", fd);
+      console.log(upRes);
+      const { fileKey } = upRes;
+
+      const vRes = await http.post<{ id: string; fileKey: string; fileName: string }>(`/resumes/${seriesId}/versions`, {
+        fileKey,
         fileName: f.name,
       });
+      const { id, fileName } = vRes;
 
-      setVersionId(vData.id);
-      setFileKey(vData.fileKey);
-      setFilename(vData.fileName);
+      setVersionId(id);
+      setFileKey(fileKey);
+      setFilename(fileName);
       setMockUrl(null);
       setRefreshKey((k) => k + 1);
     } catch (err: any) {
@@ -356,16 +340,10 @@ Nice to have: Stripe, ShadCN, Tanstack, Zustand, Capacitor, BetterAuth
             onClick={() => enabled && setStep(s.id as any)}
             className={[
               "flex-1 rounded-2xl border px-5 py-3 text-sm font-medium transition",
-              active
-                ? "border-primary/30 bg-primary/10 text-primary"
-                : enabled
-                ? "border-border bg-white hover:bg-background"
-                : "border-border bg-muted/20 text-muted cursor-not-allowed",
+              active ? "border-primary/30 bg-primary/10 text-primary" : enabled ? "border-border bg-white hover:bg-background" : "border-border bg-muted/20 text-muted cursor-not-allowed",
             ].join(" ")}
           >
-            <span className="mr-2 rounded-full border px-2 py-0.5 text-xs">
-              {s.id}
-            </span>
+            <span className="mr-2 rounded-full border px-2 py-0.5 text-xs">{s.id}</span>
             {s.label}
           </button>
         );
@@ -391,11 +369,7 @@ Nice to have: Stripe, ShadCN, Tanstack, Zustand, Capacitor, BetterAuth
                 >
                   + Neue Serie
                 </button>
-                <button
-                  type="button"
-                  className="rounded-xl border border-border bg-white px-4 py-2 text-sm hover:bg-background"
-                  onClick={triggerCreateVersion}
-                >
+                <button type="button" className="rounded-xl border border-border bg-white px-4 py-2 text-sm hover:bg-background" onClick={triggerCreateVersion}>
                   Lebenslauf hochladen
                 </button>
                 <input
@@ -412,9 +386,7 @@ Nice to have: Stripe, ShadCN, Tanstack, Zustand, Capacitor, BetterAuth
 
             {!fileKey && !mockUrl && (
               <div className="mt-4 rounded-2xl border border-dashed border-border p-5 text-center">
-                <div className="mx-auto w-full max-w-[260px] rounded-xl bg-muted/10 px-4 py-8 text-sm text-muted">
-                  Noch keine Lebenslauf-Version ausgewählt.
-                </div>
+                <div className="mx-auto w-full max-w-[260px] rounded-xl bg-muted/10 px-4 py-8 text-sm text-muted">Noch keine Lebenslauf-Version ausgewählt.</div>
               </div>
             )}
           </div>
@@ -428,16 +400,13 @@ Nice to have: Stripe, ShadCN, Tanstack, Zustand, Capacitor, BetterAuth
                   type="button"
                   onClick={previewCurrent}
                   disabled={!fileKey && !mockUrl}
-                  className={`inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-sm ${
-                    (fileKey || mockUrl) ? "border-border hover:bg-background" : "border-border text-muted cursor-not-allowed"
-                  }`}
+                  className={`inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-sm ${fileKey || mockUrl ? "border-border hover:bg-background" : "border-border text-muted cursor-not-allowed"}`}
                   title={!fileKey && !mockUrl ? "Bitte links eine Version auswählen" : "PDF ansehen"}
                 >
                   <Eye className="h-4 w-4" />
                   Aktuellen Lebenslauf ansehen
                 </button>
 
-                {/* ⭐ 新增：使用模拟数据按钮 */}
                 <button
                   type="button"
                   onClick={handleUseMock}
@@ -482,11 +451,7 @@ Nice to have: Stripe, ShadCN, Tanstack, Zustand, Capacitor, BetterAuth
               >
                 Zurücksetzen
               </button>
-              {!canAnalyze && (
-                <span className="text-xs text-muted">
-                  Bitte wähle links eine Lebenslauf-Version (oder Mock Data) und füge eine echte Stellenbeschreibung (≥ 100 Zeichen) ein.
-                </span>
-              )}
+              {!canAnalyze && <span className="text-xs text-muted">Bitte wähle links eine Lebenslauf-Version (oder Mock Data) und füge eine echte Stellenbeschreibung (≥ 100 Zeichen) ein.</span>}
             </div>
             {validMsg && <p className="mt-3 text-sm text-rose-600">{validMsg}</p>}
           </div>
@@ -506,11 +471,7 @@ Nice to have: Stripe, ShadCN, Tanstack, Zustand, Capacitor, BetterAuth
               className="mb-4 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none"
             />
             <label className="mb-2 block text-sm">Sprache (optional)</label>
-            <select
-              value={seriesLang}
-              onChange={(e) => setSeriesLang(e.target.value)}
-              className="mb-5 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none"
-            >
+            <select value={seriesLang} onChange={(e) => setSeriesLang(e.target.value)} className="mb-5 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none">
               <option value="de">Deutsch (de)</option>
               <option value="en">Englisch (en)</option>
               <option value="">—</option>
@@ -526,10 +487,7 @@ Nice to have: Stripe, ShadCN, Tanstack, Zustand, Capacitor, BetterAuth
               >
                 Abbrechen
               </button>
-              <button
-                className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white hover:opacity-95 active:opacity-90"
-                onClick={confirmCreateSeries}
-              >
+              <button className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white hover:opacity-95 active:opacity-90" onClick={confirmCreateSeries}>
                 Erstellen
               </button>
             </div>
@@ -565,17 +523,12 @@ Nice to have: Stripe, ShadCN, Tanstack, Zustand, Capacitor, BetterAuth
               type="button"
               onClick={previewCurrent}
               disabled={!fileKey && !mockUrl}
-              className={`inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-sm ${
-                (fileKey || mockUrl) ? "border-border bg-white hover:bg-background" : "border-border text-muted cursor-not-allowed"
-              }`}
+              className={`inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-sm ${fileKey || mockUrl ? "border-border bg-white hover:bg-background" : "border-border text-muted cursor-not-allowed"}`}
             >
               <Eye className="h-4 w-4" />
               PDF ansehen
             </button>
-            <button
-              onClick={handleAnalyze}
-              className="rounded-2xl bg-primary px-3 py-2 text-sm font-medium text-white hover:opacity-95 active:opacity-90"
-            >
+            <button onClick={handleAnalyze} className="rounded-2xl bg-primary px-3 py-2 text-sm font-medium text-white hover:opacity-95 active:opacity-90">
               Erneut analysieren
             </button>
           </div>
@@ -621,7 +574,7 @@ Nice to have: Stripe, ShadCN, Tanstack, Zustand, Capacitor, BetterAuth
           match={match ?? undefined}
           onNext={() => setStep(3)}
           onStartQA={() => setShowQA(true)}
-          pageLimit={14}
+          pageLimit={50}   // 放大，避免切片后看不到
           showBadge
         />
         {resume && match && (

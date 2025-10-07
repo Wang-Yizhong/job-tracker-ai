@@ -1,4 +1,4 @@
-// --- file: src/app/api/resumes/[seriesId]/activate/route.ts
+import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { cookies } from "next/headers";
@@ -11,18 +11,20 @@ export const runtime = "nodejs";
  * body: { versionId: string }
  */
 export async function POST(
-  req: Request,
-  { params }: { params: Record<string, string> }   // ✅ 内联类型，别用别名/接口
+  req: NextRequest,
+  ctx: { params: Promise<{ seriesId: string }> } // ✅ 保持 Promise 形式
 ) {
   try {
-    const cookieStore = cookies();
+    // ✅ 你当前 Next 版本里 cookies() 返回 Promise，需要 await
+    const cookieStore = await cookies();
     const token = cookieStore.get(cookieName)?.value;
     const session = token ? verifySessionValue(token) : null;
     if (!session) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    const seriesId = params?.seriesId;
+    // ✅ params 是 Promise，解构时也要 await
+    const { seriesId } = await ctx.params;
     if (!seriesId) {
       return NextResponse.json({ error: "Missing seriesId" }, { status: 400 });
     }
@@ -32,7 +34,7 @@ export async function POST(
       return NextResponse.json({ error: "versionId required" }, { status: 400 });
     }
 
-    // 校验：version 属于该 series，且 series 属于当前用户
+    // 校验 version 归属
     const exists = await prisma.resumeVersion.findFirst({
       where: { id: versionId, seriesId, series: { userId: session.uid } },
       select: { id: true },

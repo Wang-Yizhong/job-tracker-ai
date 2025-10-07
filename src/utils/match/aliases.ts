@@ -28,7 +28,7 @@ export const ALIASES: Record<string, string> = {
   "azure": "azure",
 
   // 数据库
-  "mysql": "mysql", "postgres": "postgresql", "postgres": "postgresql",
+  "mysql": "mysql", "postgres": "postgresql", 
   "mongodb": "mongodb", "mongo": "mongodb", "redis": "redis",
 
   // 测试
