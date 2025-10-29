@@ -70,6 +70,7 @@ src/
 │
 └── types/
     └── index.ts                          ← Global shared types
+
     
 ## Dataflow
 JobsPage (page.tsx)
@@ -83,6 +84,7 @@ http.get(API.jobs.base)
 /api/v1/jobs/route.ts
    ↓
 Database / Prisma / Supabase
+
 
 
 ## Roadmap
