@@ -18,6 +18,73 @@ and help job seekers reduce stress with motivational support.
 - NextAuth.js (auth)
 - Deployment: Vercel + Neon/Supabase
 
+## Project Structure(Under Construction)
+src/
+├── app/
+│   ├── (dashboard)/
+│   │   ├── jobs/
+│   │   │   ├── page.tsx                  ← Page container (UI orchestration)
+│   │   │   └── layout.tsx (optional)
+│   │   └── ...
+│   └── api/
+│       └── v1/
+│           └── jobs/
+│               └── route.ts              ← Backend logic (Next.js API Route)
+│
+├── components/
+│   ├── ui/
+│   │   ├── data-table/
+│   │   │   ├── DataTable.tsx             ← Shared table component
+│   │   │   ├── DataTablePagination.tsx   ← Shared pagination component
+│   │   │   └── DataTableToolbar.tsx (optional)
+│   │   ├── filters/
+│   │   │   ├── SearchInput.tsx
+│   │   │   └── StatusSelect.tsx
+│   │   ├── layout/
+│   │   │   └── Topbar.tsx
+│   │   └── modals/
+│   │       └── ConfirmModal.tsx
+│
+├── features/
+│   └── jobs/
+│       ├── components/
+│       │   ├── JobsTable.tsx             ← Feature-specific table
+│       │   ├── JobsFilterBar.tsx         ← Feature-specific filters
+│       │   └── JobForm.tsx               ← Create / Edit form
+│       │
+│       ├── jobs.service.ts               ← API layer (CRUD via axios)
+│       ├── use-jobs.ts                   ← Hook for state & data fetching
+│       └── types.ts                      ← Job types
+│
+├── hooks/
+│   ├── use-data-table.ts                 ← Shared pagination/sort/filter logic
+│   ├── use-debounce.ts                   ← Shared debounce utility
+│
+├── lib/
+│   ├── api/
+│   │   ├── http.ts                       ← axios instance
+│   │   ├── config.ts                     ← Base URL / version
+│   │   └── routes.ts                     ← Centralized API endpoints
+│   └── utils/
+│       └── format-date.ts
+│
+└── types/
+    └── index.ts                          ← Global shared types
+    
+## Dataflow
+JobsPage (page.tsx)
+   ↓
+useJobsQuery()
+   ↓
+useDataTable() + jobsService.list()
+   ↓
+http.get(API.jobs.base)
+   ↓
+/api/v1/jobs/route.ts
+   ↓
+Database / Prisma / Supabase
+
+
 ## Roadmap
 - AI job description analysis
 - Motivational messages
