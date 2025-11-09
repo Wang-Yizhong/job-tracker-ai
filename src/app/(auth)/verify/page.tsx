@@ -1,143 +1,105 @@
-import type { Metadata } from "next";
-import CountdownRedirect from "./CountdownRedirect";
+// --- file: src/app/(auth)/verify/page.tsx
+"use client";
+
+import { Suspense, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
+import CountdownRedirect from "@/features/auth/components/CountdownRedirect";
+import { useVerifyEmail } from "@/features/auth/hooks/useVerifyEmail";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Verify Email" };
 
-type ApiOkShape = { ok: true } | { verified: true; email?: string };
-type ApiErrShape = {
-  ok?: false;
-  code?: "TOKEN_EXPIRED" | "TOKEN_NOT_FOUND" | "INVALID_TOKEN";
-  error?: string;
-};
-
-type State =
-  | { t: "success"; email?: string; countdown: number }
-  | { t: "error"; msg: string };
-
-type SP = { token?: string; email?: string };
-
-function getBaseUrl() {
-  return (
-    process.env.NEXT_PUBLIC_APP_URL ||
-    process.env.APP_URL ||
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000")
-  );
-}
-
-async function verifyToken(
-  token: string
-): Promise<{ ok: boolean; email?: string; msg?: string }> {
-  if (!token) return { ok: false, msg: "Ungültiger Link: Token fehlt." };
-
-  try {
-    const resp = await fetch(`${getBaseUrl()}/api/verify-email`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ token }),
-      cache: "no-store",
-    });
-
-    if (!resp.ok) {
-      const text = await resp.text();
-      throw new Error(`API responded with ${resp.status}: ${text}`);
-    }
-
-    const data = (await resp.json()) as ApiOkShape | ApiErrShape;
-
-    const isOk =
-      (typeof (data as any)?.ok === "boolean" && (data as any).ok === true) ||
-      (data as any)?.verified === true;
-
-    if (isOk) {
-      const email = (data as any)?.email as string | undefined;
-      return { ok: true, email };
-    }
-
-    const code = (data as ApiErrShape)?.code;
-    const msg =
-      code === "TOKEN_EXPIRED"
-        ? "Der Verifizierungslink ist abgelaufen. Bitte fordere eine neue E-Mail an."
-        : code === "TOKEN_NOT_FOUND" || code === "INVALID_TOKEN"
-        ? "Ungültiger oder bereits verwendeter Link."
-        : (data as ApiErrShape)?.error || "Verifizierung fehlgeschlagen.";
-
-    return { ok: false, msg };
-  } catch (e: any) {
-    return { ok: false, msg: e?.message || "Verifizierung fehlgeschlagen." };
-  }
-}
-
-export default async function VerifyPage({ searchParams }: any) {
-  const resolvedParams = (await (searchParams ?? {})) as { token?: string; email?: string };
-  const token = resolvedParams.token ?? "";
-  const emailFromUrl = resolvedParams.email ?? undefined;
-
-  const result = await verifyToken(token);
-
-  const state: State = result.ok
-    ? { t: "success", email: result.email ?? emailFromUrl, countdown: 5 }
-    : { t: "error", msg: result.msg || "Verifizierung fehlgeschlagen." };
-
+export default function VerifyPage() {
   return (
     <div className="min-h-[100dvh] grid place-items-center bg-white p-6">
       <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
-        {state.t === "error" ? (
-          <>
-            <h1 className="text-xl font-semibold text-red-700">
-              Verifizierung fehlgeschlagen
-            </h1>
-            <p className="mt-2 text-sm text-slate-600">{state.msg}</p>
-            <div className="mt-4 flex gap-2">
-              <a
-                href="/auth?mode=login"
-                className="rounded-xl border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50"
-              >
-                Zum Login
-              </a>
-              <a
-                href="/auth?mode=register"
-                className="rounded-xl border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50"
-              >
-                Erneut registrieren
-              </a>
-            </div>
-          </>
-        ) : (
-          <>
-            <h1 className="text-xl font-semibold text-emerald-700">
-              Verifizierung erfolgreich 🎉
-            </h1>
-            {state.email ? (
-              <p className="mt-2 text-sm text-slate-600">
-                Deine E-Mail{" "}
-                <span className="font-medium">{state.email}</span> wurde
-                bestätigt.
-              </p>
-            ) : (
-              <p className="mt-2 text-sm text-slate-600">
-                Deine E-Mail wurde bestätigt.
-              </p>
-            )}
-
-            <CountdownRedirect
-              seconds={state.countdown}
-              href="/auth?mode=login&verified=1"
-              prefillEmail={state.email}
-            />
-
-            <div className="mt-4">
-              <a
-                href="/auth?mode=login&verified=1"
-                className="rounded-xl border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50"
-              >
-                Jetzt zum Login
-              </a>
-            </div>
-          </>
-        )}
+        <Suspense
+          fallback={
+            <>
+              <h1 className="text-xl font-semibold text-slate-700">Wird verifiziert …</h1>
+              <p className="mt-2 text-sm text-slate-600">Bitte einen Moment Geduld.</p>
+            </>
+          }
+        >
+          <VerifyClient />
+        </Suspense>
       </div>
     </div>
   );
 }
 
+// 🔹 真正使用 useSearchParams 的逻辑移到子组件里
+function VerifyClient() {
+  const sp = useSearchParams();
+  const token = sp.get("token") ?? undefined;
+  const emailFromUrl = sp.get("email") ?? undefined;
+
+  const { state, verifying } = useVerifyEmail(token);
+
+  const view = useMemo(() => {
+    if (verifying || state.t === "idle" || state.t === "loading") {
+      return (
+        <>
+          <h1 className="text-xl font-semibold text-slate-700">Wird verifiziert …</h1>
+          <p className="mt-2 text-sm text-slate-600">Bitte einen Moment Geduld.</p>
+        </>
+      );
+    }
+
+    if (state.t === "error") {
+      return (
+        <>
+          <h1 className="text-xl font-semibold text-red-700">Verifizierung fehlgeschlagen</h1>
+          <p className="mt-2 text-sm text-slate-600">{state.msg}</p>
+          <div className="mt-4 flex gap-2">
+            <a
+              href="/auth?mode=login"
+              className="rounded-xl border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50"
+            >
+              Zum Login
+            </a>
+            <a
+              href="/auth?mode=register"
+              className="rounded-xl border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50"
+            >
+              Erneut registrieren
+            </a>
+          </div>
+        </>
+      );
+    }
+
+    // success
+    const email = state.email ?? emailFromUrl;
+    return (
+      <>
+        <h1 className="text-xl font-semibold text-emerald-700">
+          Verifizierung erfolgreich 🎉
+        </h1>
+        {email ? (
+          <p className="mt-2 text-sm text-slate-600">
+            Deine E-Mail <span className="font-medium">{email}</span> wurde bestätigt.
+          </p>
+        ) : (
+          <p className="mt-2 text-sm text-slate-600">Deine E-Mail wurde bestätigt.</p>
+        )}
+
+        <CountdownRedirect
+          seconds={5}
+          href="/auth?mode=login&verified=1"
+          prefillEmail={email}
+        />
+
+        <div className="mt-4">
+          <a
+            href="/auth?mode=login&verified=1"
+            className="rounded-xl border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50"
+          >
+            Jetzt zum Login
+          </a>
+        </div>
+      </>
+    );
+  }, [state, verifying, emailFromUrl]);
+
+  return <>{view}</>;
+}

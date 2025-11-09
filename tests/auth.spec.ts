@@ -82,7 +82,7 @@ function mockAuthApi(page: Page) {
   });
 
   // 仪表盘数据
-  page.route("**/api/positions", async (route) => {
+  page.route("**/api/jobs", async (route) => {
     // 空列表
     await route.fulfill({
       status: 200,
