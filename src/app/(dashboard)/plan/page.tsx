@@ -16,7 +16,7 @@ export default function PlanPage() {
       <div className="shrink-0 px-6 pt-6">
         <div className="mb-4 flex items-center justify-between">
           <h1 className="text-2xl font-bold">Projektplan</h1>
-          <div className="text-xs text-muted">letzte Aktualisierung: 29.09.2025</div>
+          <div className="text-xs text-muted">letzte Aktualisierung: 09.11.2025</div>
         </div>
       </div>
 
