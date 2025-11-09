@@ -95,3 +95,22 @@ src/
 │
 └── utils/
     └── format-date.ts                  # Date formatting utilities
+```txt
+JobsPage (page.tsx)
+   ↓
+useJobsQuery()
+   ↓
+useDataTable() + jobsApi.list()
+   ↓
+http.get("/api/v1/jobs")
+   ↓
+/api/v1/jobs/route.ts
+   ↓
+Prisma / Database / Supabase
+
+🚀 Getting Started
+git clone https://github.com/Wang-Yizhong/job-tracker-ai.git
+cd job-tracker-ai
+npm install
+cp .env.example .env
+npm run dev
