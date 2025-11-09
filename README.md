@@ -1,102 +1,118 @@
-# Job Tracker with AI
+🧭 Job Tracker with AI
 
-A full-stack web app to track job applications, analyze job descriptions with AI, 
+A full-stack web app to track job applications, analyze job descriptions with AI,
 and help job seekers reduce stress with motivational support.
 
-## Features (MVP)
-- User accounts
-- Job CRUD (create / read / update / delete)
-- Company management
-- Application stages (Saved → Applied → Interview → Offer → Rejected)
-- Simple Kanban view
+✨ Features (MVP)
 
-## Tech Stack
-- Next.js (App Router) + TypeScript
-- Prisma + PostgreSQL
-- Tailwind CSS + shadcn/ui
-- React Hook Form + Zod
-- NextAuth.js (auth)
-- Deployment: Vercel + Neon/Supabase
+👤 User Accounts — Register / Login / Secure sessions
 
-## Project Structure(Under Construction)
+💼 Job CRUD — Create, Read, Update, Delete job entries
+
+🏢 Company Management — Manage employers and job sources
+
+📊 Application Stages — Saved → Applied → Interview → Offer → Rejected
+
+🗂️ Simple Kanban View — Visualize job progress
+
+⚙️ Tech Stack
+Layer	Stack
+Frontend	Next.js (App Router) • TypeScript • Tailwind CSS • shadcn/ui
+Forms & Validation	React Hook Form • Zod
+Backend / API	Next.js API Routes • Prisma • PostgreSQL
+Auth	NextAuth.js
+Deployment	Vercel + Neon / Supabase
+State Management	React Query v5 • Zustand
+CI / DevTools	ESLint • Prettier • GitHub Actions (optional)
+🧩 Project Structure
 src/
 ├── app/
-│   ├── (dashboard)/
-│   │   ├── jobs/
-│   │   │   ├── page.tsx                  ← Page container (UI orchestration)
-│   │   │   └── layout.tsx (optional)
-│   │   └── ...
-│   └── api/
+│   ├── layout.tsx                      # Root layout (<html>, <body>, Providers, Toaster)
+│   ├── providers.tsx                   # Global Providers (React Query, Theme, Zustand)
+│   ├── globals.css                     # Global styles & Tailwind tokens
+│   │
+│   ├── (dashboard)/                    # Authenticated user area
+│   │   └── jobs/                       # Jobs pages
+│   │       ├── page.tsx                # Page orchestration (query + CRUD + modals)
+│   │       └── layout.tsx              # Optional nested layout
+│   │
+│   └── api/                            # Server-side API routes
 │       └── v1/
 │           └── jobs/
-│               └── route.ts              ← Backend logic (Next.js API Route)
-│
-├── components/
-│   ├── ui/
-│   │   ├── data-table/
-│   │   │   ├── DataTable.tsx             ← Shared table component
-│   │   │   ├── DataTablePagination.tsx   ← Shared pagination component
-│   │   │   └── DataTableToolbar.tsx (optional)
-│   │   ├── filters/
-│   │   │   ├── SearchInput.tsx
-│   │   │   └── StatusSelect.tsx
-│   │   ├── layout/
-│   │   │   └── Topbar.tsx
-│   │   └── modals/
-│   │       └── ConfirmModal.tsx
+│               └── route.ts            # Prisma + Zod + JSON response
 │
 ├── features/
-│   └── jobs/
+│   └── jobs/                           # 🧩 Jobs domain module
 │       ├── components/
-│       │   ├── JobsTable.tsx             ← Feature-specific table
-│       │   ├── JobsFilterBar.tsx         ← Feature-specific filters
-│       │   └── JobForm.tsx               ← Create / Edit form
+│       │   ├── JobForm.tsx             # Form UI (react-hook-form + zodResolver)
+│       │   └── JobsTable.tsx           # Table UI (DataTable + actions)
 │       │
-│       ├── jobs.service.ts               ← API layer (CRUD via axios)
-│       ├── use-jobs.ts                   ← Hook for state & data fetching
-│       └── types.ts                      ← Job types
+│       ├── hooks/
+│       │   └── useJobs.ts              # CRUD hooks (React Query)
+│       │
+│       ├── api/
+│       │   └── jobsApi.ts              # REST API client (via axios)
+│       │
+│       ├── schemas/
+│       │   └── job-form.schema.ts      # Zod schema + JobFormValues type
+│       │
+│       └── types.ts                    # Job domain types + labels
+│
+├── components/
+│   └── ui/                             # Shared UI components (shadcn/ui)
+│       ├── common/
+│       │   ├── DataTable.tsx           # Generic table (sorting, pagination)
+│       │   ├── Modal.tsx               # Reusable modal
+│       │   └── ...
+│       ├── layout/
+│       │   └── Topbar.tsx              # App header
+│       └── toaster.tsx                 # Global toast notifications
 │
 ├── hooks/
-│   ├── use-data-table.ts                 ← Shared pagination/sort/filter logic
-│   ├── use-debounce.ts                   ← Shared debounce utility
+│   ├── use-toast.ts                    # Toast hook
+│   ├── use-debounce.ts                 # Debounce helper
+│   └── use-data-table.ts               # Shared table state (pagination/sort/search)
 │
 ├── lib/
-│   ├── api/
-│   │   ├── http.ts                       ← axios instance
-│   │   ├── config.ts                     ← Base URL / version
-│   │   └── routes.ts                     ← Centralized API endpoints
-│   └── utils/
-│       └── format-date.ts
+│   └── api/
+│       ├── http.ts                     # Axios instance + interceptors + CSRF handling
+│       └── config.ts                   # API base URL + version helpers
 │
-└── types/
-    └── index.ts                          ← Global shared types
+└── utils/
+    └── format-date.ts                  # Date formatting utilities
 
-    
-## Dataflow
+🔄 Data Flow
 JobsPage (page.tsx)
    ↓
 useJobsQuery()
    ↓
-useDataTable() + jobsService.list()
+useDataTable() + jobsApi.list()
    ↓
-http.get(API.jobs.base)
+http.get("/api/v1/jobs")
    ↓
 /api/v1/jobs/route.ts
    ↓
-Database / Prisma / Supabase
+Prisma / Database / Supabase
 
+🧠 Roadmap
 
+🤖 AI Job Description Analysis
 
-## Roadmap
-- AI job description analysis
-- Motivational messages
-- Search & filtering
-- Statistics dashboard
+💬 Motivational Support Messages
 
-## Getting Started
-```bash
-git clone https://github.com/<yourname>/job-tracker-ai.git
+🔍 Advanced Search & Filtering
+
+📈 Statistics Dashboard
+
+🪄 Resume Parsing & Optimization (AI-powered)
+
+🚀 Getting Started
+git clone https://github.com/Wang-Yizhong/job-tracker-ai.git
 cd job-tracker-ai
 npm install
 cp .env.example .env
 npm run dev
+
+
+Then open:
+👉 http://localhost:3000
