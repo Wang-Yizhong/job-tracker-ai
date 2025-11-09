@@ -1,15 +1,10 @@
-"use client";
+// Server Component（不要 "use client"）
+import SwaggerClient from "./SwaggerClient";
 
-import dynamic from "next/dynamic";
-import "swagger-ui-react/swagger-ui.css";
-
-const SwaggerUI = dynamic(() => import("swagger-ui-react"), { ssr: false });
+// 这些路由级配置只能放在 Server 组件/Route Handler 里
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default function ApiDocsPage() {
-  return (
-    <div className="p-6">
-      <div className="text-2xl font-semibold mb-4">Job Tracker — API Docs</div>
-      <SwaggerUI url="/api/v1/swagger" />
-    </div>
-  );
+  return <SwaggerClient url="/api/v1/swagger" />;
 }
