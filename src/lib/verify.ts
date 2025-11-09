@@ -48,7 +48,7 @@ export async function issueEmailVerifyToken(
 export async function consumeEmailVerifyToken(rawToken: string): Promise<VerifyConsumeResult> {
   // 🔑 这里补上 sha256
   const hash = sha256(rawToken);
-
+console.log(hash,'看看对的上不');
   const rec = await prisma.verificationToken.findFirst({
     where: { hash, type: EMAIL_VERIFY },
     select: { id: true, userId: true, expiresAt: true },
