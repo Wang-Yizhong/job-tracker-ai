@@ -1,30 +1,45 @@
-🧭 Job Tracker with AI
+# 🌟 Job Tracker with AI
 
-A full-stack web app to track job applications, analyze job descriptions with AI,
+A **full-stack web app** to track job applications, analyze job descriptions with AI,  
 and help job seekers reduce stress with motivational support.
 
-✨ Features (MVP)
+---
 
-👤 User Accounts — Register / Login / Secure sessions
+## 🧭 Overview
 
-💼 Job CRUD — Create, Read, Update, Delete job entries
+This project is a **modern dashboard-style job management platform** built with the latest web technologies.  
+It helps job seekers **organize applications**, **analyze job descriptions**, and **stay motivated** during the job-hunting journey.
 
-🏢 Company Management — Manage employers and job sources
+---
 
-📊 Application Stages — Saved → Applied → Interview → Offer → Rejected
+## ✨ Features (MVP)
 
-🗂️ Simple Kanban View — Visualize job progress
+- 👤 **User Accounts** — Register / Login / Secure sessions  
+- 💼 **Job CRUD** — Create, Read, Update, Delete job entries  
+- 🏢 **Company Management** — Manage employers and job sources  
+- 🧩 **Application Stages** — Saved → Applied → Interview → Offer → Rejected  
+- 🗂️ **Simple Kanban View** — Visualize job progress  
 
-⚙️ Tech Stack
-Layer	Stack
-Frontend	Next.js (App Router) • TypeScript • Tailwind CSS • shadcn/ui
-Forms & Validation	React Hook Form • Zod
-Backend / API	Next.js API Routes • Prisma • PostgreSQL
-Auth	NextAuth.js
-Deployment	Vercel + Neon / Supabase
-State Management	React Query v5 • Zustand
-CI / DevTools	ESLint • Prettier • GitHub Actions (optional)
-🧩 Project Structure
+---
+
+## ⚙️ Tech Stack
+
+| Layer | Technologies |
+|:------|:--------------|
+| **Frontend** | Next.js (App Router) • TypeScript |
+| **Styling** | Tailwind CSS • shadcn/ui |
+| **Forms & Validation** | React Hook Form • Zod |
+| **Backend / API** | Next.js API Routes • Prisma • PostgreSQL |
+| **Authentication** | NextAuth.js |
+| **Deployment** | Vercel + Neon / Supabase |
+| **State & Data** | React Query v5 • Zustand |
+| **Dev Tools** | ESLint • Prettier • GitHub Actions |
+
+---
+
+## 🧩 Project Structure
+
+```txt
 src/
 ├── app/
 │   ├── layout.tsx                      # Root layout (<html>, <body>, Providers, Toaster)
@@ -32,7 +47,7 @@ src/
 │   ├── globals.css                     # Global styles & Tailwind tokens
 │   │
 │   ├── (dashboard)/                    # Authenticated user area
-│   │   └── jobs/                       # Jobs pages
+│   │   └── jobs/                       # Jobs feature pages
 │   │       ├── page.tsx                # Page orchestration (query + CRUD + modals)
 │   │       └── layout.tsx              # Optional nested layout
 │   │
@@ -80,39 +95,3 @@ src/
 │
 └── utils/
     └── format-date.ts                  # Date formatting utilities
-
-🔄 Data Flow
-JobsPage (page.tsx)
-   ↓
-useJobsQuery()
-   ↓
-useDataTable() + jobsApi.list()
-   ↓
-http.get("/api/v1/jobs")
-   ↓
-/api/v1/jobs/route.ts
-   ↓
-Prisma / Database / Supabase
-
-🧠 Roadmap
-
-🤖 AI Job Description Analysis
-
-💬 Motivational Support Messages
-
-🔍 Advanced Search & Filtering
-
-📈 Statistics Dashboard
-
-🪄 Resume Parsing & Optimization (AI-powered)
-
-🚀 Getting Started
-git clone https://github.com/Wang-Yizhong/job-tracker-ai.git
-cd job-tracker-ai
-npm install
-cp .env.example .env
-npm run dev
-
-
-Then open:
-👉 http://localhost:3000
